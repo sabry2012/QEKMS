@@ -1,5 +1,5 @@
 # ── Stage 1: Build ─────────────────────────────────────────────────────
-FROM python:3.10-slim AS builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -14,13 +14,17 @@ RUN apt-get update && apt-get install -y \
     libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirement.txt .
-RUN pip install --user --no-cache-dir -r requirement.txt
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
 
 # ── Stage 2: Runtime ───────────────────────────────────────────────────
-FROM python:3.10-slim AS runner
+FROM python:3.11-slim AS runner
 
 # Create a non-privileged user
+RUN apt-get update && apt-get install -y \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd -r appgroup && useradd -r -g appgroup -u 1001 appuser
 
 WORKDIR /app
@@ -28,7 +32,7 @@ WORKDIR /app
 # Copy only installed packages from builder
 COPY --from=builder /root/.local /home/appuser/.local
 COPY src/ ./src/
-COPY .env .
+COPY requirements.txt .
 
 # Set environment variables for the non-root user
 ENV PATH=/home/appuser/.local/bin:$PATH

@@ -9,7 +9,7 @@ from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 from passlib.context import CryptContext
 
-MONGO_URL = "mongodb://localhost:27018"
+MONGO_URL = "mongodb://127.0.0.1:27018"
 DB_NAME = "qekms_db"
 
 ADMIN_EMAIL = "sabrygomaasem@gmail.com"
@@ -24,9 +24,6 @@ COLLECTIONS_TO_WIPE = [
     "channels",
     "messages",
     "audit_logs",
-    "audit_log",
-    "nonces",
-    "settings",
 ]
 
 async def reset():
@@ -61,6 +58,17 @@ async def reset():
     await db["admins"].insert_one({
         "email": ADMIN_EMAIL,
         "password": hashed,
+        "accounts_number": 0,
+        "is_active": True,
+        "role": "admin",
+        "created_at": datetime.utcnow().isoformat(),
+        "last_modification": datetime.utcnow().isoformat(),
+    })
+
+    # -- Seed secondary test admin --
+    await db["admins"].insert_one({
+        "email": "admin@test.com",
+        "password": pwd_context.hash("12345678"),
         "accounts_number": 0,
         "is_active": True,
         "role": "admin",

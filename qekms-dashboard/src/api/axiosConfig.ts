@@ -3,10 +3,6 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: '/api',
   withCredentials: true,
-  // NOTE: Do NOT set a global Content-Type here.
-  // axios sets 'application/json' automatically for plain objects,
-  // and 'multipart/form-data' (with boundary) automatically for FormData.
-  // A global override would break multipart file/message uploads.
 });
 
 api.interceptors.response.use(

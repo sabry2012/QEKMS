@@ -1,0 +1,12 @@
+.git
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.env
+logs
+uploads
+qekms-dashboard/node_modules
+qekms-dashboard/dist
+qekms-dashboard/.vite

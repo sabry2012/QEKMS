@@ -1,72 +1,61 @@
-import os
 import logging
+import os
 from datetime import datetime, timedelta, timezone
-from passlib.context import CryptContext
+
 import jwt
-from fastapi import Request, HTTPException, status
+from fastapi import HTTPException, Request
 from fastapi.security import HTTPBearer
+from passlib.context import CryptContext
 
 from src.config import settings
 
 logger = logging.getLogger(__name__)
 
-# JWT Config
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 JWT_ISSUER = "qekms.security.node"
 JWT_AUDIENCE = "qekms.enterprise.client"
+MAX_PASSWORD_LENGTH = 72
 
-# ✅ يدعم bcrypt + pbkdf2
 pwd_context = CryptContext(
     schemes=["pbkdf2_sha256"],
-    deprecated="auto"
+    deprecated="auto",
 )
 security = HTTPBearer()
 
 
-# 🔥 FIX: حل مشكلة 72 chars
 def _normalize_password(password: str) -> str:
-    password = password.strip()
-    return password[:72] if len(password) > 72 else password
-
-
-def _fix_password(password: str) -> str:
-    password = password.strip()
-
-    # 🔥 حل نهائي لمشكلة bcrypt
-    if len(password) > 72:
-        password = password[:72]
-
-    return password
+    """Normalize password input consistently before hash or verification."""
+    if password is None:
+        return ""
+    normalized = str(password).strip()
+    return normalized[:MAX_PASSWORD_LENGTH]
 
 
 def get_password_hash(password: str) -> str:
-    password = _fix_password(password)
-    return pwd_context.hash(password)
+    return pwd_context.hash(_normalize_password(password))
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
-        plain_password = _fix_password(plain_password)
-        return pwd_context.verify(plain_password, hashed_password)
+        return pwd_context.verify(_normalize_password(plain_password), hashed_password)
     except Exception as e:
         logger.error(f"Password verification error: {e}")
         return False
 
 
 def create_token(data: dict, expires_delta: timedelta, token_type: str = "access") -> str:
+    now = datetime.now(timezone.utc)
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + expires_delta
-
     to_encode.update({
-        "exp": expire,
-        "iat": datetime.now(timezone.utc),
+        "exp": now + expires_delta,
+        "iat": now,
         "iss": JWT_ISSUER,
         "aud": JWT_AUDIENCE,
         "jti": f"{token_type}_{os.urandom(8).hex()}",
-        "type": token_type
+        "type": token_type,
     })
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -81,14 +70,13 @@ def create_refresh_token(data: dict) -> str:
 
 def decode_access_token(token: str) -> dict:
     try:
-        payload = jwt.decode(
+        return jwt.decode(
             token,
             SECRET_KEY,
             algorithms=[ALGORITHM],
             audience=JWT_AUDIENCE,
-            issuer=JWT_ISSUER
+            issuer=JWT_ISSUER,
         )
-        return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError as e:

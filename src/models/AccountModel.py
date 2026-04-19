@@ -1,3 +1,5 @@
+import re
+
 from src.helpers.database import get_db
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -20,6 +22,8 @@ class AccountModel:
             doc["password"] = doc.pop("Password")
         if "Admin_account" in doc:
             doc["admin_account"] = doc.pop("Admin_account")
+        if doc.get("email"):
+            doc["email"] = doc["email"].strip().lower()
             
         return doc
 
@@ -38,6 +42,8 @@ class AccountModel:
             account_data["password"] = account_data.pop("Password")
         if "Admin_account" in account_data:
             account_data["admin_account"] = account_data.pop("Admin_account")
+        if account_data.get("email"):
+            account_data["email"] = account_data["email"].strip().lower()
 
         result = await db[cls.collection_name].insert_one(account_data)
         account_data["id"] = str(result.inserted_id)
@@ -46,8 +52,17 @@ class AccountModel:
 
     @classmethod
     async def get_by_email(cls, email: str):
+        if not email:
+            return None
         db = get_db()
-        doc = await db[cls.collection_name].find_one({"$or": [{"email": email}, {"Email": email}]})
+        normalized_email = email.strip().lower()
+        escaped_email = re.escape(normalized_email)
+        doc = await db[cls.collection_name].find_one({
+            "$or": [
+                {"email": {"$regex": f"^{escaped_email}$", "$options": "i"}},
+                {"Email": {"$regex": f"^{escaped_email}$", "$options": "i"}},
+            ]
+        })
         return cls._normalize(doc)
 
     @classmethod
@@ -78,6 +93,8 @@ class AccountModel:
             update_data["email"] = update_data.pop("Email")
         if "Password" in update_data:
             update_data["password"] = update_data.pop("Password")
+        if update_data.get("email"):
+            update_data["email"] = update_data["email"].strip().lower()
             
         db = get_db()
         result = await db[cls.collection_name].update_one(

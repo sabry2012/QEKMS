@@ -1,11 +1,12 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 from src.core.limiter import limiter
 from src.helpers.security import (
     verify_password,
+    get_password_hash,
     create_access_token,
     create_refresh_token,
     decode_access_token,
@@ -13,6 +14,7 @@ from src.helpers.security import (
 )
 from src.models.AccountModel import AccountModel
 from src.models.AdminModel import AdminModel
+from src.models.SettingsModel import DEFAULT_PLAN, PLAN_DURATION_DAYS, PLAN_LIMITS, SettingsModel
 from src.config import settings
 from src.services.AuditService import AuditService
 
@@ -21,7 +23,7 @@ auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
     role: str = "account"
 
@@ -36,16 +38,18 @@ class LoginRequest(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
     full_name: str = "New User"
+    plan: str = DEFAULT_PLAN
 
     class Config:
         json_schema_extra = {
             "example": {
                 "email": "user@example.com",
                 "password": "strongpassword123",
-                "full_name": "John Doe"
+                "full_name": "John Doe",
+                "plan": "free"
             }
         }
 
@@ -96,7 +100,7 @@ async def login(request: Request, response: Response, login_data: LoginRequest):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid credentials",
             )
-
+        
         # 7. Check activation status
         if not user.get("is_active", True):
             raise HTTPException(
@@ -185,34 +189,101 @@ async def register(request: Request, reg_data: RegisterRequest):
     try:
         email = reg_data.email.strip().lower()
         password = reg_data.password.strip()
+        full_name = reg_data.full_name.strip() or "New User"
+        plan = (reg_data.plan or DEFAULT_PLAN).strip().lower()
 
         if not email or not password:
-            raise HTTPException(status_code=400, detail="Email and password required")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email and password are required",
+            )
+        if len(password) < 8:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must be at least 8 characters",
+            )
+        if plan not in PLAN_LIMITS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid plan. Choose from: {list(PLAN_LIMITS.keys())}",
+            )
 
-        # check duplicate
-        if await AccountModel.get_by_email(email):
-            raise HTTPException(status_code=409, detail="User exists")
+        app_settings = await SettingsModel.get_or_create()
+        if not app_settings.get("registration_enabled", True):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Registration is currently disabled",
+            )
 
-        from src.helpers.security import get_password_hash
+        existing_account = await AccountModel.get_by_email(email)
+        existing_admin = await AdminModel.get_by_email(email)
+        if existing_account or existing_admin:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered",
+            )
+
         hashed_password = get_password_hash(password)
+        now = datetime.utcnow()
+        duration = PLAN_DURATION_DAYS.get(plan, PLAN_DURATION_DAYS[DEFAULT_PLAN])
+        limits = PLAN_LIMITS[plan]
 
         user_data = {
             "email": email,
             "password": hashed_password,
-            "full_name": reg_data.full_name,
-            "is_active": True
+            "full_name": full_name,
+            "role": "account",
+            "admin_account": "Self Registration",
+            "is_active": True,
+            "plan": plan,
+            "channels_limit": limits["channels_limit"],
+            "encryption_limit": limits["encryption_limit"],
+            "subscription_status": "active",
+            "subscription_start": now,
+            "subscription_end": now + timedelta(days=duration),
+            "payment_status": "trial" if plan == "free" else "pending",
+            "last_modification": now,
         }
 
         user = await AccountModel.create(user_data)
 
         if not user:
-            raise Exception("User creation failed")
+            logger.error("Registration failed after insert returned no user for %s", email)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Account could not be created",
+            )
 
-        return {"status": "success"}
+        try:
+            await AuditService.log(
+                event="USER_REGISTERED",
+                user_id=user.get("id"),
+                details={
+                    "email": email,
+                    "role": "account",
+                    "plan": plan,
+                    "ip": request.client.host if request.client else "unknown",
+                },
+            )
+        except Exception as audit_err:
+            logger.error(f"Audit log failed during registration: {audit_err}")
 
+        return {
+            "status": "success",
+            "message": "Registration successful",
+            "id": user.get("id"),
+            "role": "account",
+            "plan": plan,
+        }
+
+    except HTTPException:
+        raise
     except Exception as e:
-        print("REGISTER ERROR:", e)
-        raise HTTPException(status_code=500, detail="Register failed")
+        logger.error(f"REGISTER ERROR: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Registration failed",
+        )
 
 
 # ── REFRESH ────────────────────────────────────────────────────────────

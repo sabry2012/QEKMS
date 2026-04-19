@@ -31,7 +31,10 @@ services:
 
   # ✅ Backend (Live Reload)
   backend:
-    image: python:3.11
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: qekms-backend:local
     container_name: qekms-backend
     working_dir: /app
     restart: unless-stopped
@@ -54,7 +57,7 @@ services:
       - uploads_data:/app/uploads
       - logs_data:/app/logs
       - keys_data:/app/keys
-    command: sh -c "pip install -r requirements.txt && uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
   # ✅ Frontend (Hot Reload)
   frontend:
     image: node:18
