@@ -25,107 +25,227 @@ class LoginRequest(BaseModel):
     password: str
     role: str = "account"
 
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "sabrygomaasem@gmail.com",
+                "password": "admin123",
+                "role": "admin"
+            }
+        }
 
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    full_name: str = "New User"
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "user@example.com",
+                "password": "strongpassword123",
+                "full_name": "John Doe"
+            }
+        }
+
+
+# ── LOGIN ──────────────────────────────────────────────────────────────
 # ── LOGIN ──────────────────────────────────────────────────────────────
 @auth_router.post("/login")
 async def login(request: Request, response: Response, login_data: LoginRequest):
     """
     Authenticate a user and issue a JWT via HTTP-only cookie.
-
-    Blocks login if:
-    - Credentials are wrong
-    - is_active = False
-    - subscription_status = 'expired' (account users only)
-    - subscription_end is in the past (auto-detects expired accounts)
     """
-    if login_data.role == "admin":
-        user = await AdminModel.get_by_email(login_data.email)
-    else:
-        user = await AccountModel.get_by_email(login_data.email)
-
-    # Generic message prevents user enumeration
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
-
-    # Check normalized password
-    if not verify_password(login_data.password, user.get("password", "")):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
-
-    # Check is_active (set to False by admin deactivation)
-    if not user.get("is_active", True):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is inactive. Contact your administrator.",
-        )
-
-    # Account users: enforce subscription validity
-    if login_data.role != "admin":
-        # Auto-detect expired subscription by end date
-        sub_end = user.get("subscription_end")
-        if sub_end and isinstance(sub_end, datetime) and sub_end < datetime.utcnow():
-            # Mark expired in DB for future checks
-            await AccountModel.update(user["id"], {"subscription_status": "expired"})
+    try:
+        # 1. Manual validation check
+        if not login_data.email or not login_data.password:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your subscription has expired. Contact your administrator to renew.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email and password are required"
             )
 
-        # Explicit suspended status
-        sub_status = user.get("subscription_status")
-        if sub_status == "suspended":
+        # 2. Extract credentials & role
+        email = login_data.email.strip().lower()
+        password = login_data.password
+        role = login_data.role or "account"
+
+        # 3. Retrieve user based on role
+        if role == "admin":
+            user = await AdminModel.get_by_email(email)
+        else:
+            user = await AccountModel.get_by_email(email)
+
+        # 4. Critical: Check if user exists before accessing any attributes
+        if not user or not isinstance(user, dict):
+            logger.warning(f"Login failed: User not found ({email} | {role})")
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your account has been suspended. Contact your administrator.",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials",
             )
 
-    # ── Token Generation ───────────────────────────────────────────────
-    access_token = create_access_token(
-        {"sub": user["email"], "role": login_data.role, "id": user["id"]}
-    )
-    refresh_token = create_refresh_token(
-        {"sub": user["email"], "role": login_data.role, "id": user["id"]}
-    )
+        # 5. Extract fields safely using .get()
+        user_id = user.get("id") or str(user.get("_id", ""))
+        hashed_password = user.get("password") or user.get("Password")
+        user_email = user.get("email") or user.get("Email")
 
-    # Hardened Cookie Configuration
-    is_secure = settings.SECURE_COOKIES 
-    
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=is_secure,
-        samesite="lax",
-        max_age=1800, # 30 mins
-        path="/",
-    )
-    
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        secure=is_secure,
-        samesite="strict", # Hardened for refresh
-        max_age=604800, # 7 days
-        path="/auth/refresh", # Restricted path
-    )
+        # 6. Verify password safely
+        if not hashed_password or not verify_password(password, hashed_password):
+            logger.warning(f"Login failed: Password mismatch for {email}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials",
+            )
 
-    await AuditService.log(
-        event="USER_LOGIN",
-        user_id=user["id"],
-        details={
-            "email": user["email"],
-            "role": login_data.role,
-            "ip": request.client.host if request.client else None,
-        },
-    )
+        # 7. Check activation status
+        if not user.get("is_active", True):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is inactive. Contact your administrator.",
+            )
 
-    return {"message": "Login successful", "role": login_data.role}
+        # 8. Subscription enforcement for non-admins
+        if role != "admin":
+            sub_end = user.get("subscription_end")
+            # Auto-handle expired dates
+            if sub_end and isinstance(sub_end, datetime) and sub_end < datetime.utcnow():
+                await AccountModel.update(user_id, {"subscription_status": "expired"})
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your subscription has expired. Contact your administrator to renew.",
+                )
+
+            if user.get("subscription_status") == "suspended":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your account has been suspended. Contact your administrator.",
+                )
+
+        # 9. Token Generation
+        token_payload = {
+            "sub": user_email,
+            "role": role,
+            "id": user_id
+        }
+        
+        access_token = create_access_token(token_payload)
+        refresh_token = create_refresh_token(token_payload)
+
+        # 10. Prepare Response
+        is_secure = settings.SECURE_COOKIES
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=is_secure,
+            samesite="lax",
+            max_age=1800,
+            path="/",
+        )
+        
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=is_secure,
+            samesite="strict",
+            max_age=604800,
+            path="/auth/refresh",
+        )
+
+        # 11. Audit Logging (Async, safe)
+        try:
+            await AuditService.log(
+                event="USER_LOGIN",
+                user_id=user_id,
+                details={
+                    "email": user_email,
+                    "role": role,
+                    "ip": request.client.host if request.client else "unknown",
+                },
+            )
+        except Exception as audit_err:
+            logger.error(f"Audit log failed during login: {audit_err}")
+
+        return {"status": "success", "message": "Login successful", "role": role}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"CRITICAL LOGIN ERROR: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal authentication error occurred."
+        )
+
+
+# ── REGISTER ───────────────────────────────────────────────────────────
+@auth_router.post("/register", status_code=status.HTTP_201_CREATED)
+async def register(request: Request, reg_data: RegisterRequest):
+    """
+    Register a new standard account holder.
+    """
+    try:
+        email = reg_data.email.strip().lower()
+        password = reg_data.password.strip()
+
+        if not email or not password:
+            raise HTTPException(status_code=400, detail="Email and password are required")
+
+        # 1. Check for duplicates in both Admin and Account models
+        existing_admin = await AdminModel.get_by_email(email)
+        existing_act = await AccountModel.get_by_email(email)
+
+        if existing_admin or existing_act:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A user with this email address already exists."
+            )
+
+        # 2. Hash password using bcrypt (via our helper)
+        from src.helpers.security import get_password_hash
+        hashed_password = get_password_hash(password)
+
+        # 3. Create account record
+        account_data = {
+            "email": email,
+            "password": hashed_password,
+            "full_name": reg_data.full_name,
+            "is_active": True,
+            "role": "account",
+            "admin_account": "self_registration",
+            "last_modification": datetime.utcnow()
+        }
+
+        created_user = await AccountModel.create(account_data)
+
+        # 4. Log the registration
+        try:
+            await AuditService.log(
+                event="USER_REGISTERED",
+                user_id=created_user.get("id"),
+                details={
+                    "email": email,
+                    "ip": request.client.host if request.client else "unknown"
+                }
+            )
+        except Exception:
+            pass # Audit log failure shouldn't break registration
+
+        return {
+            "status": "success",
+            "message": "Account created successfully. You can now log in.",
+            "user_id": created_user.get("id")
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"CRITICAL REGISTRATION ERROR: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred during registration. Please try again later."
+        )
 
 
 # ── REFRESH ────────────────────────────────────────────────────────────

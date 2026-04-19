@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "noreply@qekms.com"
 
     # Initial admin seeding (optional; only used when both are configured)
-    ADMIN_EMAIL: Optional[str] = None
-    ADMIN_PASSWORD: Optional[str] = None
+    ADMIN_EMAIL: str = "sabrygomaasem@gmail.com"
+    ADMIN_PASSWORD: str = "admin123"
 
     # Public-facing base URL used in email login links.
     APP_URL: str = "http://localhost"

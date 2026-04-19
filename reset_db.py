@@ -9,10 +9,10 @@ from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 from passlib.context import CryptContext
 
-MONGO_URL = "mongodb://localhost:27017"
+MONGO_URL = "mongodb://localhost:27018"
 DB_NAME = "qekms_db"
 
-ADMIN_EMAIL = "sabrygomaa@gmail.com"
+ADMIN_EMAIL = "sabrygomaasem@gmail.com"
 ADMIN_PASSWORD = "admin123"
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")

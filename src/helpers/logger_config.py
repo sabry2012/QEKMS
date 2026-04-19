@@ -7,6 +7,7 @@ def setup_logging():
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
         handlers=[
-            logging.FileHandler("logs/CSAP.log") # save to file
+            logging.FileHandler("logs/CSAP.log"), # save to file
+            logging.StreamHandler()              # output to console (stdout)
         ]
     )
