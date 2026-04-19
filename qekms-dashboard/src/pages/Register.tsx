@@ -86,186 +86,125 @@ export default function Register() {
 
   /* ── Main Registration ── */
   return (
-    <div className="min-h-screen bg-mesh-dark font-sans text-white">
+    <div className="h-screen w-full flex items-center justify-center bg-mesh-dark font-sans text-white relative overflow-hidden">
       {/* Ambient */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute top-[-150px] right-[-100px] w-[600px] h-[600px] rounded-full bg-primary-cyan/5 blur-[100px]" />
-        <div className="absolute bottom-[-200px] left-[-100px] w-[600px] h-[600px] rounded-full bg-violet-500/5 blur-[100px]" />
+        <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-primary-cyan/5 blur-[120px]" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-violet-500/5 blur-[120px]" />
       </div>
 
-      {/* Nav */}
-      <header className="relative z-20 flex items-center justify-between px-8 py-5 border-b border-white/5">
-        <Link to="/" className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-mesh-gradient">
-            <Shield size={18} className="text-white" />
-          </div>
-          <span className="font-bold text-lg">QEKMS</span>
-        </Link>
-        <div className="flex items-center gap-6 text-sm text-gray-500">
-          <span>Already have access?</span>
-          <Link to="/login" className="flex items-center gap-1.5 text-primary-cyan hover:text-cyan-300 font-semibold transition-colors">
-            Sign In <ArrowRight size={14} />
-          </Link>
-        </div>
-      </header>
-
-      <main className="relative z-10 max-w-6xl mx-auto px-8 py-16 grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-16 items-start">
-        {/* ── Left: Form ── */}
-        <div>
-          <div className="mb-10">
-            <p className="text-xs font-bold tracking-[0.25em] text-primary-cyan mb-4">ENTERPRISE ONBOARDING</p>
-            <h1 className="text-4xl font-black tracking-tight text-white mb-3">Request Enterprise Access</h1>
-            <p className="text-gray-400 text-base leading-relaxed max-w-lg">
-              Submit your deployment requirements and our cryptographic team will provision
-              your dedicated node within 24–48 hours.
-            </p>
+      <div className="relative z-10 w-full max-w-6xl mx-auto px-8 flex gap-12 items-center justify-center h-full py-8">
+        {/* ── Left: Main Form Card ── */}
+        <div className="flex-1 max-w-2xl bg-white/[0.02] border border-white/5 rounded-3xl p-8 backdrop-blur-3xl overflow-hidden shadow-2xl">
+          <div className="mb-8">
+            <p className="text-[10px] font-bold tracking-[0.3em] text-primary-cyan mb-3 uppercase">Enterprise Onboarding</p>
+            <h1 className="text-4xl md:text-5xl font-black tracking-tighter leading-[1.1] mb-5">
+              <span className="text-white block">Enterprise Access</span>
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-500 drop-shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+                Registration.
+              </span>
+            </h1>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Row 1 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-500">Full Name</label>
-                <Input type="text" icon={User} required placeholder="John Smith" value={formData.full_name} onChange={update('full_name')} />
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Split row */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Identity</label>
+                <Input type="text" icon={User} required placeholder="Full Name" value={formData.full_name} onChange={update('full_name')} className="h-12 bg-black/20" />
               </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-500">Organization</label>
-                <Input type="text" icon={Building} required placeholder="ACME Corp" value={formData.company} onChange={update('company')} />
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Organization</label>
+                <Input type="text" icon={Building} required placeholder="Company" value={formData.company} onChange={update('company')} className="h-12 bg-black/20" />
               </div>
             </div>
 
-            {/* Row 2 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-500">Business Email</label>
-                <Input type="email" icon={Mail} required placeholder="ciso@company.com" value={formData.email} onChange={update('email')} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Communication</label>
+                <Input type="email" icon={Mail} required placeholder="Business Email" value={formData.email} onChange={update('email')} className="h-12 bg-black/20" />
               </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-500">Phone Number</label>
-                <Input type="tel" icon={Phone} placeholder="+1 (555) 000-0000" value={formData.phone} onChange={update('phone')} />
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Contact</label>
+                <Input type="tel" icon={Phone} placeholder="Phone Number" value={formData.phone} onChange={update('phone')} className="h-12 bg-black/20" />
               </div>
             </div>
 
-            {/* Plan Selector */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-500">Select Your Plan</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Plan Selector - Mini Mode */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Select Tier</label>
+                <Link to="/pricing" className="text-[10px] font-bold text-primary-cyan underline">View Details</Link>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 {PLANS.map(plan => (
                   <button
                     key={plan.id}
                     type="button"
                     onClick={() => setFormData({ ...formData, plan: plan.id })}
-                    className={`relative text-left p-5 rounded-xl transition-all duration-200 border ${
+                    className={`relative text-left p-4 rounded-2xl transition-all duration-200 border ${
                       formData.plan === plan.id
-                        ? 'border-primary-cyan/40 bg-primary-cyan/5'
-                        : 'border-white/10 bg-white/5'
+                        ? 'border-primary-cyan/40 bg-primary-cyan/10 shadow-mesh-glow'
+                        : 'border-white/5 bg-white/[0.03] hover:bg-white/[0.05]'
                     }`}
                   >
-                    {plan.badge && (
-                      <span className="absolute -top-3 right-4 px-3 py-1 rounded-full text-[10px] font-bold text-white bg-mesh-gradient">
-                        {plan.badge}
-                      </span>
-                    )}
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-bold text-white text-sm">{plan.name}</span>
-                      {formData.plan === plan.id && <CheckCircle2 size={16} className="text-primary-cyan" />}
+                    <div className="flex items-center justify-between font-black text-xs text-white uppercase tracking-tighter">
+                      {plan.name}
+                      {formData.plan === plan.id && <CheckCircle2 size={14} className="text-primary-cyan" />}
                     </div>
-                    <div className="flex items-baseline gap-1 mb-3">
-                      <span className="text-2xl font-black text-white">{plan.price}</span>
-                      <span className="text-gray-500 text-xs">{plan.period}</span>
-                    </div>
-                    <ul className="space-y-1">
-                      {plan.features.map((f, i) => (
-                        <li key={i} className="text-xs text-gray-400 flex items-center gap-1.5">
-                          <span className="w-1 h-1 rounded-full bg-primary-cyan shrink-0" />{f}
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="text-xl font-black text-white mt-1">{plan.price}<span className="text-[10px] text-gray-500 font-bold tracking-normal">{plan.period}</span></div>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Notes */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-500">
-                Deployment Requirements <span className="text-gray-700">(optional)</span>
-              </label>
-              <textarea
-                placeholder="Describe your infrastructure requirements, expected node count, compliance needs..."
-                value={formData.notes} onChange={update('notes')}
-                rows={4}
-                className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-600 outline-none transition-all resize-none focus:border-primary-cyan/50 focus:bg-white/10"
-              />
-            </div>
-
-            {/* Error */}
             {error && (
-              <div className="px-4 py-3 rounded-xl text-sm text-red-400 bg-red-400/10 border border-red-400/20">
+              <div className="p-3 rounded-xl text-xs text-red-500 bg-red-500/5 border border-red-500/10 font-bold">
                 {error}
               </div>
             )}
 
-            {/* Submit */}
-            <Button type="submit" className="w-full mt-4" isLoading={submitting}>
-              Submit Access Request <ArrowRight size={16} />
+            <Button type="submit" className="w-full h-14 mt-2 shadow-mesh-glow text-xs font-black uppercase tracking-[0.2em]" isLoading={submitting}>
+              Submit Handshake <ArrowRight size={16} className="ml-2" />
             </Button>
 
-            <p className="text-center text-xs text-gray-700 pt-2">
-              By submitting, you agree to our Terms of Service. All data is encrypted in transit and at rest.
-            </p>
+            <div className="flex justify-center items-center gap-6 mt-4">
+               <Link to="/login" className="text-[11px] font-bold text-gray-500 hover:text-white transition-colors">SignIn Instead</Link>
+               <Link to="/status" className="text-[11px] font-bold text-gray-500 hover:text-white transition-colors">Track Status</Link>
+            </div>
           </form>
         </div>
 
-        {/* ── Right: Info Panel ── */}
-        <div className="hidden lg:block space-y-6 sticky top-28">
-          {/* What happens next */}
-          <Card className="p-7 space-y-6">
-            <h3 className="font-bold text-white text-lg">What happens next?</h3>
-            <div className="space-y-5">
+        {/* ── Right: Side Info (Compact) ── */}
+        <div className="hidden lg:flex flex-col gap-6 max-w-xs shrink-0 h-full justify-center">
+            <h3 className="text-xs font-black text-primary-cyan uppercase tracking-[0.3em] mb-2">Protocol Pipeline</h3>
+            <div className="space-y-6">
               {[
-                { step: '01', title: 'Request Review', desc: 'Our team reviews your organization profile and requirements within 24 hours.' },
-                { step: '02', title: 'Node Provisioning', desc: 'We configure your dedicated encrypted mesh node and generate your quantum keys.' },
-                { step: '03', title: 'Credentials Delivered', desc: 'Secure credentials are delivered to your business email via encrypted channel.' },
+                { step: '01', title: 'Review', desc: 'Team reviews organization profile' },
+                { step: '02', title: 'Provision', desc: 'Secure node setup & key generation' },
+                { step: '03', title: 'Access', desc: 'Credentials delivered encrypted' },
               ].map(s => (
                 <div key={s.step} className="flex gap-4">
-                  <span className="text-xs font-black text-gray-600 shrink-0 mt-0.5">
+                  <span className="text-[10px] font-black text-gray-700 shrink-0 border border-white/10 w-6 h-6 flex items-center justify-center rounded-lg mt-0.5">
                     {s.step}
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-white mb-1">{s.title}</p>
-                    <p className="text-xs text-gray-500 leading-relaxed">{s.desc}</p>
+                    <p className="text-xs font-bold text-white mb-0.5">{s.title}</p>
+                    <p className="text-[10px] text-gray-600 leading-snug">{s.desc}</p>
                   </div>
                 </div>
               ))}
             </div>
-          </Card>
-
-          {/* Security badges */}
-          <Card className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Lock size={14} className="text-primary-cyan" />
-              <span className="text-xs font-bold text-gray-400">SECURITY POSTURE</span>
+            
+            <div className="mt-8 pt-8 border-t border-white/5 space-y-4">
+               <div className="flex items-center gap-3 grayscale opacity-30">
+                  <Lock size={14} className="text-white" />
+                  <span className="text-[10px] font-black text-white tracking-widest">ISO-27001 SECURE</span>
+               </div>
+               <p className="text-[10px] text-gray-700 font-medium">By initializing this handshake you agree to the cryptographic governance agreement.</p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {['SOC2 Type II', 'ISO 27001', 'AES-256', 'Zero-Trust', 'FIPS 140-2'].map(b => (
-                <span key={b} className="px-3 py-1 text-xs text-gray-500 rounded-lg border border-white/10">
-                  {b}
-                </span>
-              ))}
-            </div>
-          </Card>
-
-          {/* Already submitted? */}
-          <div className="text-center">
-            <Link to="/status" className="text-sm text-gray-500 hover:text-primary-cyan transition-colors">
-              Already submitted? Track your application →
-            </Link>
-          </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

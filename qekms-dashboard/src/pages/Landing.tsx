@@ -157,14 +157,14 @@ export default function Landing() {
 
       {/* ─── Hero ─── */}
       <section className="relative z-10 pt-44 pb-32 px-8 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-10 text-xs font-semibold text-cyan-400 bg-cyan-400/10 border border-cyan-400/25">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-          Military-Grade Encrypted Communication — Q4 2025 Platform
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-10 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-400 bg-cyan-400/10 border border-cyan-400/25 shadow-[0_0_15px_rgba(34,211,238,0.1)]">
+          <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)] animate-pulse" />
+          Military-Grade Encrypted Communication — Q4 2025
         </div>
 
         <h1 className="text-6xl md:text-8xl font-black tracking-tight leading-none mb-8">
           Quantum-Secure<br />
-          <span className="bg-clip-text text-transparent bg-mesh-gradient">
+          <span className="bg-clip-text text-transparent bg-mesh-gradient drop-shadow-[0_0_30px_rgba(6,182,212,0.4)]">
             For Enterprises.
           </span>
         </h1>
@@ -202,11 +202,16 @@ export default function Landing() {
       </section>
 
       {/* ─── Trust Bar ─── */}
-      <div className="relative z-10 py-8 overflow-hidden bg-white/5 border-y border-white/5">
-        <p className="text-center text-xs font-bold tracking-[0.3em] text-gray-600 mb-6">TRUSTED BY SECURITY-FOCUSED ORGANIZATIONS</p>
-        <div className="flex flex-wrap items-center justify-center gap-10">
+      <div className="relative z-10 py-10 overflow-hidden bg-white/[0.02] border-y border-white/5">
+        <p className="text-center text-[10px] font-black tracking-[0.4em] text-primary-cyan/60 mb-8 uppercase drop-shadow-[0_0_10px_rgba(6,182,212,0.2)]">
+          Trusted by Security-Focused Organizations
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
           {['SOC2 Type II', 'ISO 27001', 'AES-256 GCM', 'FIPS 140-2', 'Zero-Trust Architecture'].map((badge, i) => (
-            <span key={i} className="text-xs font-bold text-gray-500 px-4 py-2 rounded-lg bg-white/5 border border-white/10">
+            <span 
+              key={i} 
+              className="text-[10px] font-black text-gray-400 px-5 py-2.5 rounded-xl bg-white/[0.02] border border-white/5 transition-all duration-500 hover:text-white hover:border-primary-cyan/40 hover:bg-primary-cyan/5 hover:shadow-mesh-glow uppercase tracking-widest cursor-default"
+            >
               {badge}
             </span>
           ))}
@@ -216,10 +221,15 @@ export default function Landing() {
       {/* ─── Features ─── */}
       <section id="features" className="relative z-10 py-36 px-8">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-20">
-            <p className="text-xs font-bold tracking-[0.3em] text-cyan-500 mb-4">INFRASTRUCTURE PROTOCOL</p>
-            <h2 className="text-5xl md:text-6xl font-black tracking-tight text-white mb-6">Uncompromising<br />Architecture.</h2>
-            <p className="text-gray-400 text-lg max-w-xl leading-relaxed">Designed from first principles to operate in adversarial, zero-trust environments at any scale.</p>
+          <div className="mb-20 text-center">
+            <p className="text-[10px] font-black tracking-[0.4em] text-primary-cyan mb-4 uppercase">Infrastructure Protocol</p>
+            <h2 className="text-5xl md:text-6xl font-black tracking-tighter text-white mb-6 leading-[1.1]">
+              Uncompromising<br />
+              <span className="bg-clip-text text-transparent bg-mesh-gradient drop-shadow-[0_0_20px_rgba(6,182,212,0.3)]">
+                Architecture.
+              </span>
+            </h2>
+            <p className="text-gray-400 text-lg max-w-xl leading-relaxed mx-auto">Designed from first principles to operate in adversarial, zero-trust environments at any scale.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -243,8 +253,13 @@ export default function Landing() {
       <section id="pricing" className="relative z-10 py-36 px-8 bg-black/30">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-20">
-            <p className="text-xs font-bold tracking-[0.3em] text-violet-400 mb-4">ENTERPRISE TIERS</p>
-            <h2 className="text-5xl md:text-6xl font-black tracking-tight text-white mb-6">Transparent<br />Enterprise Licensing.</h2>
+            <p className="text-[10px] font-black tracking-[0.4em] text-primary-cyan mb-4 uppercase">Enterprise Tiers</p>
+            <h2 className="text-5xl md:text-6xl font-black tracking-tighter text-white mb-6 leading-[1.1]">
+              Transparent<br />
+              <span className="bg-clip-text text-transparent bg-mesh-gradient drop-shadow-[0_0_20px_rgba(6,182,212,0.3)]">
+                Enterprise Licensing.
+              </span>
+            </h2>
             <p className="text-gray-400 text-lg">Simple scaling. Immediate provisioning post-approval.</p>
           </div>
 
@@ -307,8 +322,13 @@ export default function Landing() {
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-8 bg-white/5 border border-white/10">
             <Mail size={28} className="text-gray-400" />
           </div>
-          <p className="text-xs font-bold tracking-[0.3em] text-gray-500 mb-5">GET IN TOUCH</p>
-          <h2 className="text-5xl font-black tracking-tight text-white mb-6">Contact Cybersecurity Sales.</h2>
+          <p className="text-[10px] font-black tracking-[0.4em] text-primary-cyan mb-5 uppercase">Get In Touch</p>
+          <h2 className="text-5xl md:text-6xl font-black tracking-tighter text-white mb-6 leading-[1.1]">
+            Contact<br />
+            <span className="bg-clip-text text-transparent bg-mesh-gradient drop-shadow-[0_0_20px_rgba(6,182,212,0.3)]">
+              Cybersecurity Sales.
+            </span>
+          </h2>
           <p className="text-gray-400 text-lg leading-relaxed mb-12">
             Have custom requirements? Our cryptographic engineering team is ready to scope your{' '}
             <span className="text-white font-semibold">deployment specifications</span> and threat model.
