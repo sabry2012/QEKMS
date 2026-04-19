@@ -174,20 +174,12 @@ export default function Login() {
                 layoutId="role-slider"
                 className="absolute inset-y-1.5 rounded-xl bg-mesh-gradient shadow-mesh-glow"
                 style={{ 
-                  left: role === 'account' ? '6px' : 'calc(50% + 1px)',
+                  left: role === 'admin' ? '6px' : 'calc(50% + 1px)',
                   width: 'calc(50% - 7px)'
                 }}
                 transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
               />
             </AnimatePresence>
-            <button
-              onClick={() => setRole('account')}
-              className={`flex-1 py-3 text-[13px] font-extrabold uppercase tracking-widest relative z-10 transition-colors duration-300 ${
-                role === 'account' ? 'text-white' : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              Operator
-            </button>
             <button
               onClick={() => setRole('admin')}
               className={`flex-1 py-3 text-[13px] font-extrabold uppercase tracking-widest relative z-10 transition-colors duration-300 ${
@@ -195,6 +187,14 @@ export default function Login() {
               }`}
             >
               Overseer
+            </button>
+            <button
+              onClick={() => setRole('account')}
+              className={`flex-1 py-3 text-[13px] font-extrabold uppercase tracking-widest relative z-10 transition-colors duration-300 ${
+                role === 'account' ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              Operator
             </button>
           </div>
 
