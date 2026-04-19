@@ -86,8 +86,8 @@ async def login(request: Request, response: Response, login_data: LoginRequest):
 
         # 5. Extract fields safely using .get()
         user_id = user.get("id") or str(user.get("_id", ""))
-        hashed_password = user.get("password") or user.get("Password")
-        user_email = user.get("email") or user.get("Email")
+        hashed_password = user.get("password")
+        user_email = user.get("email")
 
         # 6. Verify password safely
         if not hashed_password or not verify_password(password, hashed_password):
@@ -180,72 +180,39 @@ async def login(request: Request, response: Response, login_data: LoginRequest):
 
 
 # ── REGISTER ───────────────────────────────────────────────────────────
-@auth_router.post("/register", status_code=status.HTTP_201_CREATED)
+@auth_router.post("/register", status_code=201)
 async def register(request: Request, reg_data: RegisterRequest):
-    """
-    Register a new standard account holder.
-    """
     try:
         email = reg_data.email.strip().lower()
         password = reg_data.password.strip()
 
         if not email or not password:
-            raise HTTPException(status_code=400, detail="Email and password are required")
+            raise HTTPException(status_code=400, detail="Email and password required")
 
-        # 1. Check for duplicates in both Admin and Account models
-        existing_admin = await AdminModel.get_by_email(email)
-        existing_act = await AccountModel.get_by_email(email)
+        # check duplicate
+        if await AccountModel.get_by_email(email):
+            raise HTTPException(status_code=409, detail="User exists")
 
-        if existing_admin or existing_act:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="A user with this email address already exists."
-            )
-
-        # 2. Hash password using bcrypt (via our helper)
         from src.helpers.security import get_password_hash
         hashed_password = get_password_hash(password)
 
-        # 3. Create account record
-        account_data = {
+        user_data = {
             "email": email,
             "password": hashed_password,
             "full_name": reg_data.full_name,
-            "is_active": True,
-            "role": "account",
-            "admin_account": "self_registration",
-            "last_modification": datetime.utcnow()
+            "is_active": True
         }
 
-        created_user = await AccountModel.create(account_data)
+        user = await AccountModel.create(user_data)
 
-        # 4. Log the registration
-        try:
-            await AuditService.log(
-                event="USER_REGISTERED",
-                user_id=created_user.get("id"),
-                details={
-                    "email": email,
-                    "ip": request.client.host if request.client else "unknown"
-                }
-            )
-        except Exception:
-            pass # Audit log failure shouldn't break registration
+        if not user:
+            raise Exception("User creation failed")
 
-        return {
-            "status": "success",
-            "message": "Account created successfully. You can now log in.",
-            "user_id": created_user.get("id")
-        }
+        return {"status": "success"}
 
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"CRITICAL REGISTRATION ERROR: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred during registration. Please try again later."
-        )
+        print("REGISTER ERROR:", e)
+        raise HTTPException(status_code=500, detail="Register failed")
 
 
 # ── REFRESH ────────────────────────────────────────────────────────────

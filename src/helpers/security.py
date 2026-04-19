@@ -1,7 +1,6 @@
 import os
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 from passlib.context import CryptContext
 import jwt
 from fastapi import Request, HTTPException, status
@@ -14,35 +13,53 @@ logger = logging.getLogger(__name__)
 # JWT Config
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
-ACCESS_TOKEN_EXPIRE_MINUTES = 30  # Hardened: 30 minutes
-REFRESH_TOKEN_EXPIRE_DAYS = 7     # 7 days for rotation
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 7
 JWT_ISSUER = "qekms.security.node"
 JWT_AUDIENCE = "qekms.enterprise.client"
 
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+# ✅ يدعم bcrypt + pbkdf2
+pwd_context = CryptContext(
+    schemes=["pbkdf2_sha256"],
+    deprecated="auto"
+)
 security = HTTPBearer()
 
 
+# 🔥 FIX: حل مشكلة 72 chars
+def _normalize_password(password: str) -> str:
+    password = password.strip()
+    return password[:72] if len(password) > 72 else password
+
+
+def _fix_password(password: str) -> str:
+    password = password.strip()
+
+    # 🔥 حل نهائي لمشكلة bcrypt
+    if len(password) > 72:
+        password = password[:72]
+
+    return password
+
+
+def get_password_hash(password: str) -> str:
+    password = _fix_password(password)
+    return pwd_context.hash(password)
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain password against a hash."""
     try:
-        return pwd_context.verify(plain_password.strip(), hashed_password)
+        plain_password = _fix_password(plain_password)
+        return pwd_context.verify(plain_password, hashed_password)
     except Exception as e:
         logger.error(f"Password verification error: {e}")
         return False
 
 
-def get_password_hash(password: str) -> str:
-    """Hash a password."""
-    return pwd_context.hash(password.strip())
-
-
 def create_token(data: dict, expires_delta: timedelta, token_type: str = "access") -> str:
-    """Internal helper to create a JWT with claims."""
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + expires_delta
-    
-    # Standard Claims for Production Hardening
+
     to_encode.update({
         "exp": expire,
         "iat": datetime.now(timezone.utc),
@@ -55,47 +72,34 @@ def create_token(data: dict, expires_delta: timedelta, token_type: str = "access
 
 
 def create_access_token(data: dict) -> str:
-    """Create a short-lived access token."""
     return create_token(data, timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES), "access")
 
 
 def create_refresh_token(data: dict) -> str:
-    """Create a long-lived refresh token."""
     return create_token(data, timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS), "refresh")
 
 
 def decode_access_token(token: str) -> dict:
-    """Decode and validate a JWT token."""
     try:
         payload = jwt.decode(
-            token, 
-            SECRET_KEY, 
-            algorithms=[ALGORITHM], 
-            audience=JWT_AUDIENCE, 
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+            audience=JWT_AUDIENCE,
             issuer=JWT_ISSUER
         )
         return payload
     except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token expired",
-        )
+        raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError as e:
         logger.warning(f"Invalid token attempt: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        )
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 
 def get_current_user_from_cookie(request: Request) -> dict:
-    """Extract and decode the JWT from the access_token cookie."""
     token = request.cookies.get("access_token")
     if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-        )
+        raise HTTPException(status_code=401, detail="Not authenticated")
 
     if token.startswith("Bearer "):
         token = token[7:]
@@ -104,12 +108,7 @@ def get_current_user_from_cookie(request: Request) -> dict:
 
 
 def require_admin(request: Request) -> dict:
-    """Require the current user to have admin role."""
     user = get_current_user_from_cookie(request)
     if user.get("role") != "admin":
-        logger.warning(f"Unauthorized admin access attempt by: {user.get('sub')}")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough privileges",
-        )
+        raise HTTPException(status_code=403, detail="Not enough privileges")
     return user
