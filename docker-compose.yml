@@ -1,0 +1,89 @@
+services:
+  mongo:
+    image: mongo:latest
+    container_name: qekms-mongodb
+    restart: unless-stopped
+    command: ["mongod"]
+    ports:
+      - "27018:27017"
+    networks:
+      - qekms-network
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: qekms-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    networks:
+      - qekms-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: qekms-backend
+    restart: unless-stopped
+    # Hardening: Read-only filesystem and Capability dropping
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    ports:
+      - "8000:8000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - qekms-network
+    environment:
+      - MONGODB_URL=mongodb://mongo:27017/qekms_db
+      - DATABASE_NAME=qekms_db
+      - SECRET_KEY=super_secure_key_123!
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - uploads_data:/app/uploads
+      - logs_data:/app/logs
+      - keys_data:/app/keys
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  frontend:
+    build: ./qekms-dashboard
+    container_name: qekms-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - qekms-network
+
+networks:
+  qekms-network:
+
+volumes:
+  mongo_data:
+  uploads_data:
+  logs_data:
+  keys_data:

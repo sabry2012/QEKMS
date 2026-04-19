@@ -1,0 +1,43 @@
+services:
+  mongo:
+    image: mongo:latest
+    container_name: qekms-mongodb
+    restart: unless-stopped
+    ports:
+      - "27018:27017"
+    networks:
+      - qekms-network
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build: .
+    container_name: qekms-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo
+    networks:
+      - qekms-network
+    environment:
+      - MONGODB_URL=mongodb://mongo:27017
+      - DATABASE_NAME=qekms_db
+      - SECRET_KEY=super_secure_key_123!
+
+  frontend:
+    build: ./qekms-dashboard
+    container_name: qekms-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - qekms-network
+
+networks:
+  qekms-network:
+
+volumes:
+  mongo_data:

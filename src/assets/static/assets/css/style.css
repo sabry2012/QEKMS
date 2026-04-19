@@ -1,0 +1,129 @@
+/* QEKMS — FOUNDATION LAYER
+   File: assets/css/style.css
+   Scope: Resets, Design Tokens, Typography, Core Layout, Utilities
+*/
+
+/* ===== DESIGN TOKENS ===== */
+:root {
+    /* Color Palette — Post-Quantum Cyber */
+    --bg: #03040a;
+    --bg-alt: #071022;
+    --panel-hex: 12, 14, 20;
+    --panel: rgba(var(--panel-hex), 0.85);
+    --glass-border: rgba(255, 255, 255, 0.05);
+    
+    --neon-cyan: #7df9ff;
+    --neon-magenta: #c77dff;
+    --neon-purple: #9580ff;
+    --neon-green: #7dffb6;
+    --neon-red: #ff7d7d;
+    
+    --white: #eef2ff;
+    --muted: #8b9bb4;
+    
+    /* Effects */
+    --glass-blur: 12px;
+    --glass-saturation: 1.1;
+    --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+    --radius: 12px;
+    --transition: 300ms cubic-bezier(.19, 1, .22, 1);
+    
+    /* Typography */
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* ===== RESET & BASE ===== */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+    height: 100%;
+    background-color: var(--bg);
+}
+
+body {
+    font-family: var(--font-sans);
+    background: radial-gradient(circle at 50% 0%, var(--bg-alt) 0%, var(--bg) 100%);
+    color: var(--white);
+    line-height: 1.5;
+    overflow-x: hidden;
+}
+
+/* ===== TOOLING & SCROLLBARS ===== */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--neon-cyan);
+    opacity: 0.1;
+}
+
+/* ===== UTILITIES ===== */
+.hidden {
+    display: none !important;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.muted {
+    color: var(--muted);
+}
+
+.full-width {
+    width: 100%;
+}
+
+.text-center {
+    text-align: center;
+}
+
+/* ===== CORE LAYOUT ===== */
+.app-root {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.main-grid {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    flex: 1;
+    gap: 24px;
+    padding: 32px;
+    align-items: flex-start;
+}
+
+@media (max-width: 900px) {
+    .main-grid {
+        flex-direction: column;
+        padding: 16px;
+    }
+}
