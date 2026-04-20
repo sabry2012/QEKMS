@@ -176,14 +176,44 @@ async def list_channels(user: dict = Depends(get_current_user_from_cookie)):
     all_channels = await ChannelModel.get_all()
     user_email = user.get("sub")
     user_role = user.get("role")
-
+    
+    # Filter channels based on role
     if user_role == "admin":
-        return all_channels
+        filtered = all_channels
+    else:
+         filtered = [
+            ch for ch in all_channels
+            if (ch.get("is_group") and user_email in ch.get("members", [])) or (not ch.get("is_group") and (ch.get("sender") == user_email or ch.get("receiver") == user_email))
+        ]
 
-    return [
-        ch for ch in all_channels
-        if (ch.get("is_group") and user_email in ch.get("members", [])) or (not ch.get("is_group") and (ch.get("sender") == user_email or ch.get("receiver") == user_email))
-    ]
+    # Enrich with presence data
+    enriched = []
+    for ch in filtered:
+        # Determine counterpart for direct channels
+        other_email = None
+        if not ch.get("is_group"):
+            other_email = ch["receiver"] if ch["sender"] == user_email else ch["sender"]
+        
+        if other_email:
+            # Check online status
+            is_online = chat_manager.is_user_online(other_email)
+            
+            # Fetch last_seen from DB if not online
+            last_seen = None
+            if not is_online:
+                other_user = await AccountModel.get_by_email(other_email) or await AdminModel.get_by_email(other_email)
+                if other_user:
+                    last_seen = other_user.get("last_seen")
+                    if last_seen and hasattr(last_seen, "isoformat"):
+                        last_seen = last_seen.isoformat()
+            
+            ch["other_presence"] = {
+                "status": "online" if is_online else "offline",
+                "last_seen": last_seen
+            }
+        enriched.append(ch)
+
+    return enriched
 
 
 @channel_router.post("/")
@@ -517,14 +547,15 @@ async def send_secure_message(
 
     user_email = user["sub"]
     
-    # 1. Freshness Check (±30s)
-    now_ms = int(datetime.utcnow().timestamp() * 1000)
-    if abs(now_ms - data.timestamp) > 30000:
-        await AuditService.log_event("Replay Attack Detected (Timestamp)", user_id=user_email, severity="HIGH")
-        raise HTTPException(status_code=403, detail="Message too old or time desync.")
+    # 1. Freshness Check (±30 minutes — allows for significant clock skew/TZ issues)
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    diff = abs(now_ms - data.timestamp)
+    if diff > 1800000:
+        await AuditService.log_event(f"Replay Attack Detected (Timestamp) | Gap: {diff}ms | Server: {now_ms} | Client: {data.timestamp}", user_id=user_email, severity="HIGH")
+        raise HTTPException(status_code=403, detail=f"Message too old or time desync (Gap: {diff}ms).")
 
     # 2. Replay Check (Nonce)
-    if await NonceModel.is_replay(data.nonce, datetime.fromtimestamp(data.timestamp/1000)):
+    if await NonceModel.is_replay(data.nonce, datetime.fromtimestamp(data.timestamp/1000, tz=timezone.utc)):
         await AuditService.log_event("Replay Attack Detected (Nonce)", user_id=user_email, severity="HIGH")
         raise HTTPException(status_code=403, detail="Duplicate nonce detected.")
 
@@ -537,12 +568,16 @@ async def send_secure_message(
     plain_master = base64.b64decode(key_meta["master_key_bin"])
     signing_key = qekms.derive_signing_key(plain_master)
     
-    # Reconstruct signed data: ciphertext + nonce + timestamp
-    signed_raw = f"{data.ciphertext}{data.nonce}{data.timestamp}"
+    # Reconstruct signed data: ciphertext|nonce|timestamp (Standardized)
+    signed_raw = f"{data.ciphertext}|{data.nonce}|{data.timestamp}"
+    signed_bytes = signed_raw.encode("utf-8")
     
-    if not qekms.verify_hmac(signed_raw.encode("utf-8"), base64.b64decode(data.signature), signing_key):
-        await AuditService.log_event("Integrity Tamper Detected", user_id=user_email, severity="HIGH")
-        raise HTTPException(status_code=403, detail="Signature verification failed.")
+    if not qekms.verify_hmac(signed_bytes, base64.b64decode(data.signature), signing_key):
+        # Diagnostic logging: log full hex for debugging (Internal Audit)
+        sig_received = base64.b64decode(data.signature).hex()
+        diag_msg = f"HMAC Fail | StringHex: {signed_bytes.hex()} | SigRecv: {sig_received} | KeyHexPrefix: {signing_key.hex()[:10]}"
+        await AuditService.log_event(diag_msg, user_id=user_email, severity="HIGH")
+        raise HTTPException(status_code=403, detail="Signature verification failed (Integrity Check).")
 
     message_doc = {
         "channel_id": channel_id,
@@ -576,6 +611,57 @@ async def send_secure_message(
     )
     
     return saved
+
+
+@channel_router.post("/{channel_id}/upload")
+async def upload_channel_file(
+    channel_id: str,
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user_from_cookie),
+):
+    """
+    Upload a media/file attachment for a channel message.
+    Returns the file_path (relative), file_name, msg_type, and public URL.
+    The actual encrypted message is sent separately via the /send endpoint.
+    """
+    channel = await ChannelModel.get_by_id(channel_id)
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found.")
+
+    user_email = user["sub"]
+    if user["role"] != "admin" and user_email not in (
+        [channel.get("sender"), channel.get("receiver")] + channel.get("members", [])
+    ):
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    file_bytes = await file.read()
+    msg_type = _validate_file(file, file_bytes)
+
+    ext = os.path.splitext(file.filename or "file")[1].lower() or ".bin"
+    unique_name = f"{uuid.uuid4()}{ext}"
+    dest_path = os.path.join(UPLOAD_DIR, unique_name)
+
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    with open(dest_path, "wb") as f:
+        f.write(file_bytes)
+
+    await AuditService.log(
+        "FILE_UPLOADED",
+        user_id=user_email,
+        details={
+            "channel_id": channel_id,
+            "file_name": file.filename,
+            "file_size": len(file_bytes),
+            "msg_type": msg_type,
+        },
+    )
+
+    return {
+        "file_path": unique_name,
+        "file_name": file.filename or unique_name,
+        "msg_type": msg_type,
+        "url": f"/uploads/{unique_name}",
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -655,11 +741,6 @@ async def websocket_chat(websocket: WebSocket, channel_id: str):
                 pass
                 
     except WebSocketDisconnect:
-        disconnected_email = chat_manager.disconnect(websocket, channel_id)
-        if disconnected_email:
-            await chat_manager.broadcast(channel_id, {
-                "type": "presence",
-                "user": disconnected_email,
-                "status": "offline",
-                "last_seen": datetime.utcnow().isoformat()
-            })
+        # disconnect is now async and handles its own presence broadcasting + DB updates
+        await chat_manager.disconnect(websocket, channel_id)
+

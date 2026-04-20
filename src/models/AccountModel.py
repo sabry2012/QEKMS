@@ -22,6 +22,8 @@ class AccountModel:
             doc["password"] = doc.pop("Password")
         if "Admin_account" in doc:
             doc["admin_account"] = doc.pop("Admin_account")
+        if "last_seen" in doc:
+            doc["last_seen"] = doc["last_seen"]
         if doc.get("email"):
             doc["email"] = doc["email"].strip().lower()
             
@@ -44,6 +46,8 @@ class AccountModel:
             account_data["admin_account"] = account_data.pop("Admin_account")
         if account_data.get("email"):
             account_data["email"] = account_data["email"].strip().lower()
+        if "last_seen" not in account_data:
+            account_data["last_seen"] = None
 
         result = await db[cls.collection_name].insert_one(account_data)
         account_data["id"] = str(result.inserted_id)

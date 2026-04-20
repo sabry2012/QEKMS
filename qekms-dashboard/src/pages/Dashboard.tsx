@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
-  Send, ShieldIcon, Activity, Lock, Scan, Key,
-  UserCircle, Search, MoreVertical, Plus, RefreshCw, Radio,
-  Cpu, Zap, Fingerprint, MessageSquare, ChevronLeft, LayoutDashboard, Globe, AlertTriangle
+  Send, ShieldIcon, Lock, Scan, Key,
+  UserCircle, Search, Plus, RefreshCw,
+  Cpu, Zap, Fingerprint, Globe, AlertTriangle,
+  Paperclip, Mic, StopCircle, FileText, X, Download, Play,
+  ChevronLeft, Radio, SendHorizonal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axiosConfig';
@@ -20,7 +22,16 @@ interface Message {
   sender: string;
   content: string;
   timestamp: string;
-  type?: 'system' | 'chat' | 'file' | 'image';
+  created_at?: string;
+  type?: 'text' | 'image' | 'video' | 'voice' | 'file';
+  file_path?: string;
+  file_name?: string;
+}
+
+interface PendingMedia {
+  file: File;
+  objectUrl: string | null;
+  msgType: 'image' | 'video' | 'voice' | 'file';
 }
 
 interface Channel {
@@ -50,6 +61,8 @@ export default function Dashboard() {
   // UI state
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateChannel, setShowCreateChannel] = useState(false);
+  const [securityError, setSecurityError] = useState<string | null>(null);
+  const [presence, setPresence] = useState<Record<string, { status: 'online' | 'offline', last_seen?: string }>>({});
   const [receiverEmail, setReceiverEmail] = useState('');
   const [createError, setCreateError] = useState('');
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
@@ -59,11 +72,21 @@ export default function Dashboard() {
   const currentLimit = PLAN_LIMITS[user?.plan || 'free'] || 5;
   const isAtLimit = currentLimit !== -1 && channels.length >= currentLimit;
 
+  // Media state
+  const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+
   // Refs
   const channelAbortController = useRef<AbortController | null>(null);
   const messageAbortController = useRef<AbortController | null>(null);
   const ws = useRef<WebSocket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -98,6 +121,16 @@ export default function Dashboard() {
         signal: channelAbortController.current.signal
       });
       setChannels(data);
+
+      // Seed presence state from initial channel list
+      const initialPresence: Record<string, any> = {};
+      data.forEach((ch: any) => {
+          if (ch.other_presence) {
+              const other = ch.sender === user?.email ? ch.receiver : ch.sender;
+              initialPresence[other] = ch.other_presence;
+          }
+      });
+      setPresence(prev => ({ ...initialPresence, ...prev }));
     } catch (err: any) {
       if (err.name === 'CanceledError') return;
       setChannelError(err.response?.data?.detail || 'Failed to sync mesh nodes');
@@ -108,6 +141,12 @@ export default function Dashboard() {
 
   // ── 3. Load Messages ──────────────────────────────────────────────
   const loadInitialMessages = useCallback(async (channel: Channel) => {
+    if (!isSecurityReady) {
+      console.warn('[Dashboard] loadInitialMessages called before security was ready. Aborting.');
+      setMessageError('Handshake failed: Security mismatch');
+      return;
+    }
+
     setLoadingMessages(true);
     setMessageError('');
     setMessages([]);
@@ -123,7 +162,7 @@ export default function Dashboard() {
       });
 
       const version = keyData.version || 1;
-      await securityService.loadChannelKey(channel.id, version, keyData.wrapped_key);
+      await securityService.loadChannelKey(channel.id, keyData.wrapped_key, version);
       setKeyStatus('ready');
 
       const { data: encryptedMsgs } = await api.get(`/channels/${channel.id}/messages`, {
@@ -150,15 +189,15 @@ export default function Dashboard() {
     } finally {
       setLoadingMessages(false);
     }
-  }, []);
+  }, [isSecurityReady]);
 
   // ── 4. WebSockets ──────────────────────────────────────────────────
   useEffect(() => {
     if (!activeChannel || keyStatus !== 'ready') return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const backendUrl = (import.meta as any).env.VITE_BACKEND_URL;
-    const cleanUrl = backendUrl.replace(/^https?:\/\//, '');
+    const rawBackendUrl = (import.meta as any).env.VITE_BACKEND_URL || 'http://localhost:8000';
+    const cleanUrl = rawBackendUrl.replace(/^https?:\/\//, '');
     const socketUrl = `${protocol}//${cleanUrl}/channels/ws/chat/${activeChannel.id}`;
 
     const socket = new WebSocket(socketUrl);
@@ -173,6 +212,11 @@ export default function Dashboard() {
             const msg: Message = { ...msgData, content: decrypted };
             setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
             setTimeout(scrollToBottom, 50);
+        } else if (payload.type === 'presence') {
+            setPresence(prev => ({
+                ...prev,
+                [payload.user]: { status: payload.status, last_seen: payload.last_seen }
+            }));
         }
       } catch (err) {
         console.error('[Dashboard] Real-time Error:', err);
@@ -191,7 +235,81 @@ export default function Dashboard() {
     };
   }, [initializeSecurity, fetchChannels]);
 
-  // ── 6. Actions ────────────────────────────────────────────────────
+  // Auto-load messages if a channel was selected before the handshake finished
+  useEffect(() => {
+    if (isSecurityReady && activeChannel && keyStatus === 'idle') {
+      loadInitialMessages(activeChannel);
+    }
+  }, [isSecurityReady, activeChannel, keyStatus, loadInitialMessages]);
+
+  // ── 6. Media Helpers ──────────────────────────────────────────────
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    let msgType: 'image' | 'video' | 'voice' | 'file' = 'file';
+
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) msgType = 'image';
+    else if (['mp4', 'webm', 'mov'].includes(ext || '')) msgType = 'video';
+    else if (['mp3', 'wav', 'ogg', 'm4a'].includes(ext || '')) msgType = 'voice';
+
+    setPendingMedia({
+      file,
+      objectUrl: URL.createObjectURL(file),
+      msgType
+    });
+  };
+
+  const cancelPendingMedia = () => {
+    if (pendingMedia?.objectUrl) URL.revokeObjectURL(pendingMedia.objectUrl);
+    setPendingMedia(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const file = new File([audioBlob], `recording-${Date.now()}.webm`, { type: 'audio/webm' });
+        setPendingMedia({
+          file,
+          objectUrl: URL.createObjectURL(audioBlob),
+          msgType: 'voice'
+        });
+        stream.getTracks().forEach(t => t.stop());
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      setRecordSeconds(0);
+      recordTimerRef.current = setInterval(() => {
+        setRecordSeconds(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('[Dashboard] Recording failed:', err);
+      setMessageError('Microphone access denied or error');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+    }
+  };
+
+  // ── 7. Actions ────────────────────────────────────────────────────
   const handleSelectChannel = (channel: Channel) => {
     setActiveChannel(channel);
     setMobileView('chat');
@@ -200,18 +318,41 @@ export default function Dashboard() {
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !activeChannel || keyStatus !== 'ready') return;
+    if ((!newMessage.trim() && !pendingMedia) || !activeChannel || keyStatus !== 'ready') return;
 
-    const content = newMessage;
-    setNewMessage('');
+    setIsUploading(true);
+    let fileMeta = null;
 
     try {
+      // 1. Handle Media Upload if exists
+      if (pendingMedia) {
+        const formData = new FormData();
+        formData.append('file', pendingMedia.file);
+        const { data: uploadData } = await api.post(`/channels/${activeChannel.id}/upload`, formData);
+        fileMeta = uploadData;
+      }
+
+      // 2. Prepare and Send Encrypted Message
+      const content = newMessage.trim() || (pendingMedia ? `Shared a ${pendingMedia.msgType}` : '');
       const version = activeChannel.current_key_version || 1;
-      const securePayload = await securityService.prepareOutgoing(content, activeChannel.id, version);
+      
+      const securePayload: any = await securityService.prepareOutgoing(content, activeChannel.id, version);
+      
+      if (fileMeta) {
+        securePayload.msg_type = fileMeta.msg_type;
+        securePayload.file_path = fileMeta.file_path;
+        securePayload.file_name = fileMeta.file_name;
+      }
+
       await api.post(`/channels/${activeChannel.id}/send`, securePayload);
+      
+      setNewMessage('');
+      cancelPendingMedia();
     } catch (err) {
-      console.error('[Dashboard] Transmission Failed:', err);
-      setMessageError('Security layer rejected outgoing payload');
+      console.error('[Dashboard] Send Failed:', err);
+      setMessageError('Failed to send message or upload file');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -385,20 +526,36 @@ export default function Dashboard() {
                                     {(activeChannel.sender === user?.email ? activeChannel.receiver : activeChannel.sender).split('@')[0]}
                                 </h3>
                                 <div className="flex items-center gap-2 mt-0.5">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Established P2P Link</span>
+                                    {presence[(activeChannel.sender === user?.email ? activeChannel.receiver : activeChannel.sender)]?.status === 'online' ? (
+                                        <>
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                            <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Online Now</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="w-1.5 h-1.5 rounded-full bg-gray-500" />
+                                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">
+                                                {presence[(activeChannel.sender === user?.email ? activeChannel.receiver : activeChannel.sender)]?.last_seen 
+                                                   ? `Last seen ${new Date(presence[(activeChannel.sender === user?.email ? activeChannel.receiver : activeChannel.sender)].last_seen!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+                                                   : 'Established P2P Link'}
+                                            </span>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
 
-                        <div className={`hidden md:flex items-center gap-3 px-5 py-2.5 rounded-2xl border transition-all ${
-                            keyStatus === 'ready' ? 'bg-primary-cyan/10 border-primary-cyan/30 text-primary-cyan shadow-mesh-glow' : 'bg-amber-500/10 border-amber-500/30 text-amber-500'
-                        }`}>
-                            <Fingerprint size={16} />
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] mt-0.5">
-                                {keyStatus === 'ready' ? 'Cipher Validated' : 'Handshaking...'}
-                            </span>
-                        </div>
+                                 {keyStatus === 'ready' ? (
+                                    <div className="flex items-center gap-2">
+                                        <Fingerprint size={16} />
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] mt-0.5">Cipher Validated</span>
+                                    </div>
+                                 ) : (
+                                    <div className="flex items-center gap-2">
+                                        <RefreshCw size={16} className="animate-spin" />
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] mt-0.5">Handshaking...</span>
+                                    </div>
+                                 )}
                     </div>
 
                     {/* Messages */}
@@ -422,12 +579,65 @@ export default function Dashboard() {
                                                 className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                                             >
                                                 <div className={`max-w-[80%] lg:max-w-[70%] group`}>
-                                                    <Card className={`p-4 rounded-3xl ${
+                                                    <Card className={`p-1 overflow-hidden rounded-3xl ${
                                                         isMe 
                                                             ? 'bg-mesh-gradient text-white border-transparent rounded-tr-none shadow-mesh-glow shadow-primary-cyan/10' 
                                                             : 'bg-white/5 border-white/5 text-gray-200 rounded-tl-none'
                                                     }`}>
-                                                        <p className="m-0 text-sm leading-relaxed font-medium">{msg.content}</p>
+                                                        <div className="p-3">
+                                                            {/* Media Rendering */}
+                                                            {msg.type === 'image' && msg.file_path && (
+                                                                <div className="mb-2 rounded-2xl overflow-hidden border border-white/10">
+                                                                    <img 
+                                                                        src={msg.file_path.startsWith('http') ? msg.file_path : `${(import.meta as any).env.VITE_BACKEND_URL || 'http://localhost:8000'}/uploads/${msg.file_path}`} 
+                                                                        alt="attachment" 
+                                                                        className="w-full max-h-80 object-cover"
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                            {msg.type === 'video' && msg.file_path && (
+                                                                <div className="mb-2 rounded-2xl overflow-hidden border border-white/10 bg-black">
+                                                                    <video 
+                                                                        src={msg.file_path.startsWith('http') ? msg.file_path : `${(import.meta as any).env.VITE_BACKEND_URL || 'http://localhost:8000'}/uploads/${msg.file_path}`} 
+                                                                        controls 
+                                                                        className="w-full max-h-80"
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                            {msg.type === 'voice' && msg.file_path && (
+                                                                <div className="mb-2 p-2 rounded-2xl bg-black/20 border border-white/5">
+                                                                    <audio 
+                                                                        src={msg.file_path.startsWith('http') ? msg.file_path : `${(import.meta as any).env.VITE_BACKEND_URL || 'http://localhost:8000'}/uploads/${msg.file_path}`} 
+                                                                        controls 
+                                                                        className="w-full h-8"
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                            {msg.type === 'file' && msg.file_path && (
+                                                                <a 
+                                                                    href={`${(import.meta as any).env.VITE_BACKEND_URL || 'http://localhost:8000'}/uploads/${msg.file_path}`} 
+                                                                    target="_blank" 
+                                                                    rel="noopener noreferrer"
+                                                                    className="mb-2 p-3 rounded-2xl bg-black/20 border border-white/5 flex items-center gap-3 hover:bg-black/30 transition-colors no-underline text-inherit"
+                                                                >
+                                                                    <div className="p-2 bg-primary-cyan/20 rounded-lg text-primary-cyan">
+                                                                        <FileText size={18} />
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="text-xs font-bold truncate m-0">{msg.file_name || 'Attached File'}</p>
+                                                                        <p className="text-[10px] opacity-40 m-0 uppercase tracking-widest">Download Asset</p>
+                                                                    </div>
+                                                                    <Download size={16} className="opacity-40" />
+                                                                </a>
+                                                            )}
+                                                            
+                                                            {/* Text Content */}
+                                                            {msg.content && (
+                                                                <p className={`m-0 text-sm leading-relaxed font-medium ${msg.type ? 'mt-1 px-1' : ''}`}>
+                                                                    {msg.content}
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                     </Card>
                                                     <div className={`flex items-center gap-2 mt-2 px-1 opacity-40 text-[9px] font-black uppercase tracking-[0.2em] ${isMe ? 'justify-end' : 'justify-start'}`}>
                                                         <Lock size={10} />
@@ -443,24 +653,113 @@ export default function Dashboard() {
                     </div>
 
                     {/* Input */}
-                    <div className="p-6 bg-white/[0.02] border-t border-white/5 backdrop-blur-xl">
+                    <div className="p-6 bg-white/[0.02] border-t border-white/5 backdrop-blur-xl relative">
+                        {/* Hidden File Input */}
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            onChange={handleFileSelect} 
+                            className="hidden" 
+                        />
+
+                        {/* Media Preview Overlay */}
+                        <AnimatePresence>
+                            {pendingMedia && (
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 20 }}
+                                    className="absolute bottom-full left-6 right-6 mb-4 p-4 rounded-3xl bg-mesh-dark border border-white/10 shadow-2xl z-10"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-black/40 border border-white/10 flex items-center justify-center relative">
+                                            {pendingMedia.msgType === 'image' && pendingMedia.objectUrl && (
+                                                <img src={pendingMedia.objectUrl} alt="preview" className="w-full h-full object-cover" />
+                                            )}
+                                            {pendingMedia.msgType === 'video' && (
+                                                <div className="text-primary-cyan"><Play size={24} /></div>
+                                            )}
+                                            {pendingMedia.msgType === 'voice' && (
+                                                <div className="text-primary-cyan"><Mic size={24} /></div>
+                                            )}
+                                            {pendingMedia.msgType === 'file' && (
+                                                <div className="text-primary-cyan"><FileText size={24} /></div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-black text-white truncate uppercase tracking-tight">{pendingMedia.file.name}</p>
+                                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{pendingMedia.msgType} Ready for encryption</p>
+                                        </div>
+                                        <button 
+                                            onClick={cancelPendingMedia}
+                                            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all border-none cursor-pointer"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
                         <form onSubmit={sendMessage} className="flex gap-4 items-center">
+                            {/* Attachment Button */}
+                            <button 
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 hover:text-primary-cyan hover:border-primary-cyan/30 transition-all cursor-pointer"
+                            >
+                                <Paperclip size={22} />
+                            </button>
+
                             <div className="flex-1 relative group">
                                 <Input 
-                                    placeholder="TRANSMIT SECURE PAYLOAD..."
-                                    icon={Zap}
+                                    placeholder={isRecording ? 'RECORDING IN PROGRESS...' : "TRANSMIT SECURE PAYLOAD..."}
+                                    icon={isRecording ? Radio : Zap}
                                     value={newMessage}
                                     onChange={e => setNewMessage(e.target.value)}
-                                    disabled={keyStatus !== 'ready'}
-                                    className="h-14 bg-black/40 border-white/10 focus:bg-black/60 font-mono text-sm"
+                                    disabled={keyStatus !== 'ready' || isRecording || !!pendingMedia && pendingMedia.msgType === 'voice'}
+                                    className={`h-14 bg-black/40 border-white/10 focus:bg-black/60 font-mono text-sm ${isRecording ? 'text-primary-cyan animate-pulse' : ''}`}
                                 />
+                                {isRecording && (
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                                        <span className="text-[10px] font-black text-red-500 font-mono">
+                                            {Math.floor(recordSeconds / 60)}:{(recordSeconds % 60).toString().padStart(2, '0')}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
+
+                            {/* Recording / Stop Button */}
+                            {!isRecording ? (
+                                <button 
+                                    type="button"
+                                    onClick={startRecording}
+                                    disabled={keyStatus !== 'ready' || !!pendingMedia}
+                                    className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-500/30 transition-all cursor-pointer disabled:opacity-30"
+                                >
+                                    <Mic size={22} />
+                                </button>
+                            ) : (
+                                <button 
+                                    type="button"
+                                    onClick={stopRecording}
+                                    className="w-14 h-14 rounded-2xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-500 animate-pulse cursor-pointer"
+                                >
+                                    <StopCircle size={22} />
+                                </button>
+                            )}
+
                             <Button 
                                 type="submit"
-                                disabled={!newMessage.trim() || keyStatus !== 'ready'}
+                                disabled={(!newMessage.trim() && !pendingMedia) || keyStatus !== 'ready' || isRecording || isUploading}
                                 className="w-14 h-14 p-0 shadow-mesh-glow rounded-2xl shrink-0"
                             >
-                                <Send size={22} className="ml-1" />
+                                {isUploading ? (
+                                    <RefreshCw size={22} className="animate-spin" />
+                                ) : (
+                                    <Send size={22} className="ml-1" />
+                                )}
                             </Button>
                         </form>
                     </div>

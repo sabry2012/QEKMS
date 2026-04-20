@@ -21,6 +21,8 @@ class AdminModel:
             doc["password"] = doc.pop("Password")
         if doc.get("email"):
             doc["email"] = doc["email"].strip().lower()
+        if "last_seen" in doc:
+            doc["last_seen"] = doc["last_seen"]
             
         return doc
 
@@ -33,6 +35,8 @@ class AdminModel:
             admin_data["password"] = admin_data.pop("Password")
         if admin_data.get("email"):
             admin_data["email"] = admin_data["email"].strip().lower()
+        if "last_seen" not in admin_data:
+            admin_data["last_seen"] = None
             
         result = await db[cls.collection_name].insert_one(admin_data)
         admin_data["id"] = str(result.inserted_id)
