@@ -492,5 +492,17 @@ async def list_audit_logs(
     limit: int = Query(100, ge=1, le=1000)
 ):
     """Retrieve security audit logs, newest first."""
-    from src.models.AuditLogModel import AuditLogModel
-    return await AuditLogModel.get_recent(severity=severity, limit=limit)
+    return await AuditService.get_logs(severity=severity, limit=limit)
+
+
+@admin_router.get("/stats", dependencies=[Depends(require_admin)])
+async def get_system_stats():
+    """Aggregate system metrics for the dashboard."""
+    return await AuditService.get_stats()
+
+
+@admin_router.get("/quantum/status", dependencies=[Depends(require_admin)])
+async def get_quantum_health(request: Request):
+    """Retrieve the current health and metrics of the Quantum Key Management System."""
+    qekms = request.app.QEKMS_service
+    return qekms.get_quantum_status()

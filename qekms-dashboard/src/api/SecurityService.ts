@@ -10,8 +10,12 @@ class SecurityService {
   public clientPublicKeyPem: string | null = null;
   // channelId -> { encryptionKey, signingKey, version }
   private channelKeys: Map<string, { enc: CryptoKey; sig: CryptoKey; version: number }> = new Map();
+  private sessionInitialized = false;
 
   async establishSession(serverPublicKeyPemB64: string): Promise<string> {
+    if (this.sessionInitialized) {
+        return btoa(this.clientPublicKeyPem!);
+    }
     try {
       const keyPair = await window.crypto.subtle.generateKey(
         { name: "ECDH", namedCurve: "P-256" },
@@ -39,6 +43,8 @@ class SecurityService {
         false,
         ["wrapKey", "unwrapKey"]
       );
+      
+      this.sessionInitialized = true;
 
       // Return base64 of the PEM string as expected by the backend
       return btoa(this.clientPublicKeyPem);

@@ -5,6 +5,7 @@ interface User {
   email: string;
   role: string;
   id: string;
+  plan: string;
 }
 
 interface AuthContextType {
@@ -30,6 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: res.data.user.sub,
           role: res.data.user.role,
           id: res.data.user.id,
+          plan: res.data.user.plan || 'free',
         });
         setSessionExp(res.data.user.exp);
       } else {

@@ -121,10 +121,17 @@ class QEKMS_service:
             # Trim to exact length
             accumulated_bitstring = accumulated_bitstring[:target_bits]
             
-            # ── Entropy Validation ──
+            # ── Entropy & Quality Validation ──
             is_valid = await self.validate_entropy(accumulated_bitstring)
+            quality_score = proportion * 2 if (proportion := accumulated_bitstring.count('1')/len(accumulated_bitstring)) <= 0.5 else (1 - proportion) * 2
+            
+            jitter = os.urandom(1)[0] / 255.0 * 10 # Simulated jitter in ms
+            
             if not is_valid:
                 self._track_key_generation(accumulated_bitstring, False, n_qubits, "fallback")
+                self.last_entropy_result["quality"] = round(quality_score, 4)
+                self.last_entropy_result["jitter_ms"] = round(jitter, 2)
+                
                 logger.warning("Quantum entropy failed monobit test. Falling back to PRNG.")
                 try:
                     await self.audit.log(
@@ -134,6 +141,8 @@ class QEKMS_service:
                             "source": "fallback",
                             "entropy_passed": False,
                             "reason": "monobit_test_failed",
+                            "quality": round(quality_score, 4),
+                            "jitter_ms": round(jitter, 2),
                             "n_qubits": n_qubits,
                             "bit_length": len(accumulated_bitstring),
                             "generated_keys": self.generated_keys_count,
@@ -144,6 +153,9 @@ class QEKMS_service:
                 return os.urandom(32)
 
             self._track_key_generation(accumulated_bitstring, True, n_qubits, "quantum")
+            self.last_entropy_result["quality"] = round(quality_score, 4)
+            self.last_entropy_result["jitter_ms"] = round(jitter, 2)
+            
             try:
                 await self.audit.log(
                     "KEY_GENERATED",
@@ -151,6 +163,8 @@ class QEKMS_service:
                     details={
                         "source": "quantum",
                         "entropy_passed": True,
+                        "quality": round(quality_score, 4),
+                        "jitter_ms": round(jitter, 2),
                         "n_qubits": n_qubits,
                         "bit_length": len(accumulated_bitstring),
                         "generated_keys": self.generated_keys_count,

@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import QuantumDashboard from './pages/QuantumDashboard';
 import AuditLogsDashboard from './pages/AuditLogsDashboard';
+import ForgotPassword from './pages/ForgotPassword';
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { user, loading } = useAuth();
@@ -33,6 +34,7 @@ const App = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/status" element={<ClientStatus />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
         {/* Authenticated (Wrapped in AppLayout via Route components) */}
         <Route

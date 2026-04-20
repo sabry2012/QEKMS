@@ -186,6 +186,7 @@ async def list_channels(user: dict = Depends(get_current_user_from_cookie)):
     ]
 
 
+@channel_router.post("/")
 @channel_router.post("/create")
 async def create_channel(
     data: CreateChannelRequest,
@@ -193,13 +194,31 @@ async def create_channel(
     user: dict = Depends(get_current_user_from_cookie),
 ):
     sender_email = user.get("sub")
+    sender_role = user.get("role")
     receiver_email = str(data.receiver_email)
+    
     if sender_email == receiver_email:
         raise HTTPException(status_code=400, detail="Cannot create a channel with yourself.")
 
+    # 1. Plan Limit Enforcement (Skip for Admin)
+    if sender_role != "admin":
+        sender = await AccountModel.get_by_email(sender_email)
+        plan = sender.get("plan", DEFAULT_PLAN) if sender else DEFAULT_PLAN
+        limits = PLAN_LIMITS.get(plan, PLAN_LIMITS[DEFAULT_PLAN])
+        channels_limit = limits.get("channels_limit", 5)
+
+        if channels_limit != -1:
+            current_count = await ChannelModel.count_user_channels(sender_email)
+            if current_count >= channels_limit:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Subscription limit reached ({current_count}/{channels_limit}). Please upgrade for more mappings."
+                )
+
+    # 2. Verify receiver exists (Account or Admin)
     receiver = await AccountModel.get_by_email(receiver_email) or await AdminModel.get_by_email(receiver_email)
     if not receiver or not receiver.get("is_active", True):
-        raise HTTPException(status_code=404, detail="Receiver not found or inactive.")
+        raise HTTPException(status_code=404, detail="Receiver node not found in mesh or is inactive.")
 
     existing = await ChannelModel.get_by_participants(sender_email, receiver_email)
     if existing:

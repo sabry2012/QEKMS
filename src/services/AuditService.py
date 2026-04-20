@@ -44,3 +44,37 @@ class AuditService:
     @staticmethod
     async def get_logs(severity: str = None, limit: int = 100):
         return await AuditModel.get_recent(limit=limit, severity=severity)
+
+    @staticmethod
+    async def get_stats():
+        """Aggregate audit logs into actionable metrics for the admin dashboard."""
+        logs = await AuditModel.get_recent(limit=1000)
+        
+        stats = {
+            "logins": 0,
+            "login_failures": 0,
+            "keys_generated": 0,
+            "quantum_source": 0,
+            "fallback_source": 0,
+            "threats_detected": 0,
+        }
+        
+        for log in logs:
+            evt = log.get("event", "")
+            details = log.get("details", {})
+            severity = details.get("severity") or log.get("severity")
+            
+            if evt == "USER_LOGIN":
+                stats["logins"] += 1
+            elif "Login failed" in evt or severity == "HIGH" and "Login" in evt:
+                stats["login_failures"] += 1
+            elif evt == "KEY_GENERATED":
+                stats["keys_generated"] += 1
+                if details.get("source") == "quantum":
+                    stats["quantum_source"] += 1
+                else:
+                    stats["fallback_source"] += 1
+            elif severity == "HIGH" or "Attack" in evt:
+                stats["threats_detected"] += 1
+                
+        return stats
