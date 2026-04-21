@@ -12,9 +12,9 @@ import { Card } from '../components/ui/Card';
 const PLANS = [
   {
     id: 'starter',
-    name: 'Starter Node',
+    name: 'Starter',
     price: '$29',
-    period: '/mo',
+    period: '/month',
   },
   {
     id: 'professional',

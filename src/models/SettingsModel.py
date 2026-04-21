@@ -6,14 +6,14 @@ PLAN_LIMITS = {
     "starter": {
         "channels_limit": 10, 
         "encryption_limit": 100,
-        "max_users_per_channel": 2,
+        "max_users_per_channel": 5,
         "max_file_size_mb": 10,
         "priority_level": "standard"
     },
     "professional": {
         "channels_limit": 50, 
         "encryption_limit": 500,
-        "max_users_per_channel": 10,
+        "max_users_per_channel": 20,
         "max_file_size_mb": 50,
         "priority_level": "high"
     },
@@ -34,8 +34,8 @@ CLIENT_PLANS = ["starter", "professional", "enterprise"]
 # Subscription durations in days per plan
 PLAN_DURATION_DAYS = {
     "starter": 30,
-    "professional": 365,
-    "enterprise": 365,
+    "professional": 30,
+    "enterprise": 30,
 }
 
 

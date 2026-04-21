@@ -7,14 +7,17 @@ import { Card } from '../components/ui/Card';
 const UpgradePage = () => {
     const plans = [
         {
-            name: 'Free Node',
-            price: '$0',
-            duration: 'Forever',
+            name: 'Starter',
+            price: '$29',
+            duration: 'per month',
             features: [
-                'Up to 5 Lifetime Tunnels',
-                'Standard P2P Encryption',
-                'Mobile & Web Access',
-                'Community Intelligence'
+                'Up to 10 Channels',
+                '100 Encryptions / month',
+                'Max 5 users per channel',
+                'File upload limit: 10 MB',
+                'Standard encryption priority',
+                'Basic audit logs',
+                'Email support'
             ],
             icon: Shield,
             color: 'text-gray-400',
@@ -28,11 +31,14 @@ const UpgradePage = () => {
             duration: 'per month',
             popular: true,
             features: [
-                '50 Lifetime Tunnels',
-                'Advanced Entropy Rotation',
-                'High-Bandwidth Media Stream',
-                'Biometric Authentication',
-                'Priority Mesh Routing'
+                'Up to 50 Channels',
+                '500 Encryptions / month',
+                'Max 20 users per channel',
+                'File upload limit: 50 MB',
+                'High-priority processing',
+                'Advanced audit logs',
+                'Real-time notifications',
+                'Priority support'
             ],
             icon: Zap,
             color: 'text-primary-cyan',
@@ -45,12 +51,14 @@ const UpgradePage = () => {
             price: 'Custom',
             duration: 'Contact Sales',
             features: [
-                'Unlimited Tunnels & Groups',
-                'Sovereign Node Deployment',
-                'Dedicated Quantum Entropies',
-                'Zero-Knowledge Backups',
-                '24/7 Hardened Support',
-                'Full Audit Governance'
+                'Unlimited Channels',
+                'Unlimited Encryptions',
+                'Unlimited users per channel',
+                'File limit: 250 MB+',
+                'Mission-critical priority',
+                'Full audit & compliance',
+                'Quantum key resources',
+                '24/7 Premium support'
             ],
             icon: Globe,
             color: 'text-violet-500',

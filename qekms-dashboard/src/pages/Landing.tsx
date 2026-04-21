@@ -72,15 +72,18 @@ const STATS = [
 
 const PLANS = [
   {
-    name: 'Free Node',
-    price: '$0',
-    period: 'Forever',
-    desc: 'Community Intelligence',
+    name: 'Starter',
+    price: '$29',
+    period: '/month',
+    desc: 'Essential encryption for small teams.',
     features: [
-      'Up to 5 Lifetime Tunnels',
-      'Standard P2P Encryption',
-      'Mobile & Web Access',
-      'Community Intelligence',
+      'Up to 10 Channels',
+      '100 Encryptions / month',
+      'Max 5 users per channel',
+      'File upload limit: 10 MB',
+      'Standard encryption priority',
+      'Basic audit logs',
+      'Email support'
     ],
     cta: 'Get Started',
     highlighted: false,
@@ -96,11 +99,14 @@ const PLANS = [
     period: '/month',
     desc: 'For focused institutional security teams.',
     features: [
-      '50 Lifetime Tunnels',
-      'Advanced Entropy Rotation',
-      'High-Bandwidth Media Stream',
-      'Biometric Authentication',
-      'Priority Mesh Routing'
+      'Up to 50 Channels',
+      '500 Encryptions / month',
+      'Max 20 users per channel',
+      'File upload limit: 50 MB',
+      'High-priority processing',
+      'Advanced audit logs',
+      'Real-time notifications',
+      'Priority support'
     ],
     cta: 'Unlock Access',
     highlighted: true,
@@ -116,12 +122,14 @@ const PLANS = [
     period: 'Contact Sales',
     desc: 'Unlimited scale for multinational infrastructure.',
     features: [
-      'Unlimited Tunnels & Groups',
-      'Sovereign Node Deployment',
-      'Dedicated Quantum Entropies',
-      'Zero-Knowledge Backups',
-      '24/7 Hardened Support',
-      'Full Audit Governance'
+      'Unlimited Channels',
+      'Unlimited Encryptions',
+      'Unlimited users per channel',
+      'File limit: 250 MB+',
+      'Mission-critical priority',
+      'Full audit & compliance',
+      'Quantum key resources',
+      '24/7 Premium support'
     ],
     cta: 'Contact Sales',
     highlighted: false,
