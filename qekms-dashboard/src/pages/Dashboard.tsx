@@ -5,7 +5,7 @@ import {
   UserCircle, Search, Plus, RefreshCw,
   Cpu, Zap, Fingerprint, Globe, AlertTriangle,
   Paperclip, Mic, StopCircle, FileText, X, Download, Play,
-  ChevronLeft, Radio, SendHorizonal
+  ChevronLeft, Radio, SendHorizonal, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axiosConfig';
@@ -15,6 +15,133 @@ import { ErrorState } from '../components/ErrorState';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
+import { PlayCircle, PauseCircle } from 'lucide-react';
+
+// ── Components ───────────────────────────────────────────────────────
+// ── Components ───────────────────────────────────────────────────────
+const VoiceNote = ({ url, isMe, timestamp }: { url: string, isMe: boolean, timestamp: string }) => {
+    const [isPlaying, setIsPlaying] = useState(false);
+    const audioRef = useRef<HTMLAudioElement>(null);
+    const [progress, setProgress] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);
+    const [hasError, setHasError] = useState(false);
+
+    const cleanUrl = url.replace(/\/uploads\/uploads\//g, '/uploads/');
+
+    useEffect(() => {
+        if (audioRef.current) audioRef.current.load();
+    }, [cleanUrl]);
+
+    const toggle = () => {
+        if (!audioRef.current || hasError) return;
+        if (isPlaying) {
+            audioRef.current.pause();
+            setIsPlaying(false);
+        } else {
+            audioRef.current.play()
+                .then(() => setIsPlaying(true))
+                .catch(e => {
+                    console.error("Audio Playback Error:", e);
+                    setHasError(true);
+                });
+        }
+    };
+
+    const handleTimeUpdate = () => {
+        if (audioRef.current) {
+            const current = audioRef.current.currentTime;
+            const dur = audioRef.current.duration || 0;
+            if (dur > 0) setProgress((current / dur) * 100);
+        }
+    };
+
+    const onLoadedMetadata = () => {
+        setDuration(audioRef.current?.duration || 0);
+        setIsLoading(false);
+    };
+
+    const formatTime = (time: number) => {
+        if (!time || isNaN(time)) return "0:00";
+        const mins = Math.floor(time / 60);
+        const secs = Math.floor(time % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const displayTime = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+    return (
+        <div className="flex items-center gap-4 px-4 py-3 min-w-[280px] select-none bg-transparent">
+            {/* Play Button - Clean WhatsApp Style */}
+            <button 
+                onClick={toggle} 
+                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0 ${
+                    hasError ? 'bg-red-500/20 text-red-500' : isMe ? 'bg-white/20 text-white' : 'bg-primary-cyan/20 text-primary-cyan'
+                } hover:scale-105 active:scale-95`}
+                disabled={hasError}
+            >
+                {isLoading ? (
+                    <RefreshCw size={24} className="animate-spin opacity-40" />
+                ) : hasError ? (
+                    <AlertTriangle size={24} />
+                ) : isPlaying ? (
+                    <PauseCircle size={32} fill="currentColor" />
+                ) : (
+                    <PlayCircle size={32} fill="currentColor" className="ml-1" />
+                )}
+            </button>
+
+            <div className="flex-1 flex flex-col gap-1.5 mt-0.5">
+                <div 
+                    className="h-8 w-full relative flex items-center cursor-pointer group"
+                    onClick={(e) => {
+                        if (!audioRef.current || !duration) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const pct = (e.clientX - rect.left) / rect.width;
+                        audioRef.current.currentTime = pct * duration;
+                    }}
+                >
+                    <div className="absolute inset-x-0 inset-y-0 flex items-center gap-[2px] opacity-10">
+                        {Array.from({ length: 28 }).map((_, i) => (
+                            <div key={i} className="flex-1 bg-white" style={{ height: `${30 + Math.sin(i * 0.4) * 50}%`, borderRadius: '4px' }} />
+                        ))}
+                    </div>
+                    
+                    <div className="absolute inset-x-0 inset-y-0 flex items-center gap-[2px] overflow-hidden pointer-events-none" style={{ width: `${progress}%` }}>
+                        {Array.from({ length: 28 }).map((_, i) => (
+                            <div key={i} className={`flex-1 ${isMe ? 'bg-white' : 'bg-primary-cyan'}`} style={{ height: `${30 + Math.sin(i * 0.4) * 50}%`, borderRadius: '4px' }} />
+                        ))}
+                    </div>
+
+                    <motion.div 
+                        className={`absolute w-1 h-8 ${isMe ? 'bg-white/40' : 'bg-primary-cyan/40'} z-10 pointer-events-none`}
+                        style={{ left: `${progress}%`, marginLeft: '-0.5px' }}
+                        animate={{ opacity: isPlaying ? 0.8 : 0.3 }}
+                    />
+                </div>
+
+                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest tabular-nums tabular-nums">
+                    <span className="opacity-60">{isPlaying ? formatTime(audioRef.current?.currentTime || 0) : formatTime(duration)}</span>
+                    <div className="flex items-center gap-1 opacity-40">
+                        <span>{displayTime}</span>
+                        <Lock size={8} />
+                    </div>
+                </div>
+            </div>
+
+            <audio 
+                ref={audioRef} 
+                src={cleanUrl} 
+                onTimeUpdate={handleTimeUpdate}
+                onEnded={() => { setIsPlaying(false); setProgress(0); }}
+                onLoadedMetadata={onLoadedMetadata}
+                onError={() => { setHasError(true); setIsLoading(false); }}
+                className="hidden" 
+                preload="auto"
+            />
+        </div>
+    );
+};
 
 // ── Types ────────────────────────────────────────────────────────────
 interface Message {
@@ -77,6 +204,7 @@ export default function Dashboard() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Refs
   const channelAbortController = useRef<AbortController | null>(null);
@@ -217,6 +345,10 @@ export default function Dashboard() {
                 ...prev,
                 [payload.user]: { status: payload.status, last_seen: payload.last_seen }
             }));
+        } else if (payload.type === 'messages_cleared') {
+          if (activeChannel && payload.channel_id === activeChannel.id) {
+            setMessages([]);
+          }
         }
       } catch (err) {
         console.error('[Dashboard] Real-time Error:', err);
@@ -316,6 +448,22 @@ export default function Dashboard() {
     loadInitialMessages(channel);
   };
 
+  const handleClearChat = async (channelId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to PERMANENTLY delete all messages in this tunnel?')) return;
+    try {
+        const { data } = await api.delete(`/channels/${channelId}/messages`);
+        console.log(`[Dashboard] Clear Chat Result: ${data.deleted_count} messages deleted.`);
+        if (activeChannel?.id === channelId) {
+            setMessages([]);
+        }
+    } catch (err) { 
+        console.error("[Dashboard] Failed to clear history:", err);
+        setMessageError("Failed to purge tunnel history");
+        setTimeout(() => setMessageError(''), 3000);
+    }
+  };
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!newMessage.trim() && !pendingMedia) || !activeChannel || keyStatus !== 'ready') return;
@@ -333,13 +481,13 @@ export default function Dashboard() {
       }
 
       // 2. Prepare and Send Encrypted Message
-      const content = newMessage.trim() || (pendingMedia ? `Shared a ${pendingMedia.msgType}` : '');
+      const content = newMessage.trim();
       const version = activeChannel.current_key_version || 1;
       
       const securePayload: any = await securityService.prepareOutgoing(content, activeChannel.id, version);
       
       if (fileMeta) {
-        securePayload.msg_type = fileMeta.msg_type;
+        securePayload.msg_type = pendingMedia?.msgType || fileMeta.msg_type;
         securePayload.file_path = fileMeta.file_path;
         securePayload.file_name = fileMeta.file_name;
       }
@@ -441,39 +589,52 @@ export default function Dashboard() {
                         <div className="w-10 h-10 border-2 border-primary-cyan/20 border-t-primary-cyan rounded-full animate-spin" />
                         <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Scanning Protocols...</span>
                     </div>
-                ) : filteredChannels.map(channel => {
-                    const isActive = activeChannel?.id === channel.id;
-                    const other = channel.sender === user?.email ? channel.receiver : channel.sender;
-                    return (
-                        <motion.button
-                            key={channel.id}
-                            whileHover={{ x: 4 }}
-                            onClick={() => handleSelectChannel(channel)}
-                            className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 group text-left cursor-pointer ${
-                                isActive 
-                                    ? 'bg-primary-cyan/10 border-primary-cyan/30 text-white shadow-mesh-glow shadow-primary-cyan/5' 
-                                    : 'bg-transparent border-transparent hover:bg-white/5 hover:border-white/10 text-gray-400'
-                            }`}
-                        >
-                            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border transition-all duration-500 ${
-                                isActive ? 'bg-primary-cyan/20 border-primary-cyan/30 text-primary-cyan' : 'bg-black/30 border-white/10 text-gray-600 group-hover:text-gray-300'
-                            }`}>
-                                <Cpu size={20} className={isActive ? 'animate-pulse' : ''} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-center mb-0.5">
-                                    <span className="text-[13px] font-black truncate uppercase tracking-tight">{other.split('@')[0]}</span>
-                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-widest ${
-                                        channel.is_pending ? 'text-amber-500 border-amber-500/20 bg-amber-500/5' : 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5'
+                ) : (
+                    filteredChannels.map(channel => {
+                        const isActive = activeChannel?.id === channel.id;
+                        const other = channel.sender === user?.email ? channel.receiver : channel.sender;
+                        return (
+                            <div
+                                key={channel.id}
+                                className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 group ${
+                                    isActive 
+                                        ? 'bg-primary-cyan/10 border-primary-cyan/30 text-white' 
+                                        : 'bg-transparent border-transparent hover:bg-white/5 hover:border-white/10 text-gray-400'
+                                }`}
+                            >
+                                <div 
+                                    onClick={() => handleSelectChannel(channel)}
+                                    className="flex-1 flex items-center gap-4 cursor-pointer min-w-0"
+                                >
+                                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border transition-all duration-500 ${
+                                        isActive ? 'bg-primary-cyan/20 border-primary-cyan/30 text-primary-cyan' : 'bg-black/30 border-white/10 text-gray-600 group-hover:text-gray-300'
                                     }`}>
-                                        {channel.is_pending ? 'Sync' : 'Live'}
-                                    </span>
+                                        <Cpu size={20} className={isActive ? 'animate-pulse' : ''} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between items-center mb-0.5">
+                                            <span className="text-[13px] font-black truncate uppercase tracking-tight">{other.split('@')[0]}</span>
+                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-widest ${
+                                                channel.is_pending ? 'text-amber-500 border-amber-500/20 bg-amber-500/5' : 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5'
+                                            }`}>
+                                                {channel.is_pending ? 'Sync' : 'Live'}
+                                            </span>
+                                        </div>
+                                        <p className="m-0 text-[10px] text-gray-500 truncate font-mono">{other}</p>
+                                    </div>
                                 </div>
-                                <p className="m-0 text-[10px] text-gray-500 truncate font-mono">{other}</p>
+                                
+                                <button
+                                    onClick={(e) => handleClearChat(channel.id, e)}
+                                    className="w-8 h-8 rounded-lg bg-white/5 hover:bg-red-500/10 text-gray-400 hover:text-red-500 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shrink-0 border-none cursor-pointer"
+                                    title="Clear History"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
                             </div>
-                        </motion.button>
-                    )
-                })}
+                        );
+                    })
+                )}
             </div>
           </Card>
         </div>
@@ -578,71 +739,103 @@ export default function Dashboard() {
                                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                                 className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                                             >
-                                                <div className={`max-w-[80%] lg:max-w-[70%] group`}>
-                                                    <Card className={`p-1 overflow-hidden rounded-3xl ${
+                                                <div className={`max-w-[80%] lg:max-w-[240px] group flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                                                    <div className={`rounded-xl shadow-lg transition-all overflow-hidden ${
                                                         isMe 
-                                                            ? 'bg-mesh-gradient text-white border-transparent rounded-tr-none shadow-mesh-glow shadow-primary-cyan/10' 
-                                                            : 'bg-white/5 border-white/5 text-gray-200 rounded-tl-none'
+                                                            ? 'bg-blue-600 text-white rounded-tr-none' 
+                                                            : 'bg-zinc-800 text-gray-200 rounded-tl-none'
                                                     }`}>
-                                                        <div className="p-3">
-                                                            {/* Media Rendering */}
-                                                            {msg.type === 'image' && msg.file_path && (
-                                                                <div className="mb-2 rounded-2xl overflow-hidden border border-white/10">
-                                                                    <img 
-                                                                        src={msg.file_path.startsWith('http') ? msg.file_path : `${(import.meta as any).env.VITE_BACKEND_URL || 'http://localhost:8000'}/uploads/${msg.file_path}`} 
-                                                                        alt="attachment" 
-                                                                        className="w-full max-h-80 object-cover"
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            {msg.type === 'video' && msg.file_path && (
-                                                                <div className="mb-2 rounded-2xl overflow-hidden border border-white/10 bg-black">
-                                                                    <video 
-                                                                        src={msg.file_path.startsWith('http') ? msg.file_path : `${(import.meta as any).env.VITE_BACKEND_URL || 'http://localhost:8000'}/uploads/${msg.file_path}`} 
-                                                                        controls 
-                                                                        className="w-full max-h-80"
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            {msg.type === 'voice' && msg.file_path && (
-                                                                <div className="mb-2 p-2 rounded-2xl bg-black/20 border border-white/5">
-                                                                    <audio 
-                                                                        src={msg.file_path.startsWith('http') ? msg.file_path : `${(import.meta as any).env.VITE_BACKEND_URL || 'http://localhost:8000'}/uploads/${msg.file_path}`} 
-                                                                        controls 
-                                                                        className="w-full h-8"
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            {msg.type === 'file' && msg.file_path && (
-                                                                <a 
-                                                                    href={`${(import.meta as any).env.VITE_BACKEND_URL || 'http://localhost:8000'}/uploads/${msg.file_path}`} 
-                                                                    target="_blank" 
-                                                                    rel="noopener noreferrer"
-                                                                    className="mb-2 p-3 rounded-2xl bg-black/20 border border-white/5 flex items-center gap-3 hover:bg-black/30 transition-colors no-underline text-inherit"
-                                                                >
-                                                                    <div className="p-2 bg-primary-cyan/20 rounded-lg text-primary-cyan">
-                                                                        <FileText size={18} />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <p className="text-xs font-bold truncate m-0">{msg.file_name || 'Attached File'}</p>
-                                                                        <p className="text-[10px] opacity-40 m-0 uppercase tracking-widest">Download Asset</p>
-                                                                    </div>
-                                                                    <Download size={16} className="opacity-40" />
-                                                                </a>
-                                                            )}
-                                                            
-                                                            {/* Text Content */}
-                                                            {msg.content && (
-                                                                <p className={`m-0 text-sm leading-relaxed font-medium ${msg.type ? 'mt-1 px-1' : ''}`}>
+                                                        {/* Unified Media Renderer */}
+                                                        {(() => {
+                                                            const mediaUrl = msg.file_path?.startsWith('http') ? msg.file_path : `${(import.meta as any).env.VITE_BACKEND_URL || 'http://localhost:8000'}/uploads/${msg.file_path}`;
+                                                            switch (msg.type) {
+                                                                case 'image':
+                                                                    return (
+                                                                        <div className="relative cursor-pointer hover:opacity-95 transition-opacity group/media" onClick={() => setPreviewImage(mediaUrl)}>
+                                                                            <img src={mediaUrl} alt="attachment" className="w-full object-cover block" />
+                                                                            {/* Overlay for image only (no caption) */}
+                                                                            {(!msg.content || msg.content.trim() === "") && (
+                                                                                <>
+                                                                                    <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                                                                                    <div className="absolute bottom-1.5 right-2 flex items-center gap-1 opacity-70 text-[9px] font-bold text-white">
+                                                                                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                                        <Lock size={8} />
+                                                                                    </div>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                case 'video':
+                                                                    // Fallback: If it's a recording but tagged as video by backend
+                                                                    if (msg.file_path?.includes('recording-') || msg.file_path?.includes('rec-')) {
+                                                                        return <VoiceNote url={mediaUrl} isMe={isMe} timestamp={msg.timestamp} />;
+                                                                    }
+                                                                    return (
+                                                                        <div 
+                                                                            className="relative group/media bg-black shrink-0 cursor-pointer"
+                                                                            onClick={(e) => {
+                                                                                const v = e.currentTarget.querySelector('video');
+                                                                                if (v) {
+                                                                                    if (v.paused) v.play().catch(console.error);
+                                                                                    else v.pause();
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            <video src={mediaUrl} className="w-full block" preload="metadata" playsInline />
+                                                                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover/media:bg-black/30 transition-colors pointer-events-none">
+                                                                                <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 text-white">
+                                                                                    <Play size={24} fill="currentColor" className="ml-1" />
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* Overlay for video only (no caption) */}
+                                                                            {(!msg.content || msg.content.trim() === "") && (
+                                                                                <>
+                                                                                    <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                                                                                    <div className="absolute bottom-1.5 right-2 flex items-center gap-1 opacity-70 text-[9px] font-bold text-white">
+                                                                                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                                        <Lock size={8} />
+                                                                                    </div>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                case 'voice':
+                                                                    return <VoiceNote url={mediaUrl} isMe={isMe} timestamp={msg.timestamp} />;
+                                                                case 'file':
+                                                                    return (
+                                                                        <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2 no-underline text-inherit hover:opacity-80 transition-opacity">
+                                                                            <div className={`p-1.5 rounded-lg ${isMe ? 'bg-blue-500' : 'bg-zinc-700'}`}>
+                                                                                <FileText size={16} />
+                                                                            </div>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <p className="text-[11px] font-black truncate m-0 uppercase tracking-tighter">{msg.file_name || 'FileAsset'}</p>
+                                                                            </div>
+                                                                            <Download size={14} className="opacity-40" />
+                                                                        </a>
+                                                                    );
+                                                                default: return null;
+                                                            }
+                                                        })()}
+                                                        
+                                                        {/* Text Content - Only if exists */}
+                                                        {msg.content && msg.content.trim() !== "" && (
+                                                            <div className="px-3 py-2 relative bg-inherit">
+                                                                <p className="m-0 text-[13px] leading-snug font-medium break-words">
                                                                     {msg.content}
                                                                 </p>
-                                                            )}
-                                                        </div>
-                                                    </Card>
-                                                    <div className={`flex items-center gap-2 mt-2 px-1 opacity-40 text-[9px] font-black uppercase tracking-[0.2em] ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                                        <Lock size={10} />
-                                                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                <div className="flex items-center justify-end gap-1 opacity-30 text-[8px] font-black uppercase tracking-widest mt-1">
+                                                                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                    <Lock size={8} />
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
+                                                    {msg.type && msg.type !== 'image' && msg.type !== 'video' && msg.type !== 'voice' && (
+                                                        <div className="flex items-center gap-1.5 mt-1 px-1 opacity-30 text-[8px] font-black uppercase tracking-widest">
+                                                            <Lock size={8} />
+                                                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </motion.div>
                                         )
@@ -823,6 +1016,15 @@ export default function Dashboard() {
                     </div>
                 )}
               </Card>
+          </div>
+      )}
+      {/* ── Image Lightbox ── */}
+      {previewImage && (
+          <div className="fixed inset-0 bg-black/95 z-[2000] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setPreviewImage(null)}>
+              <button className="absolute top-8 right-8 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white border-none cursor-pointer">
+                  <X size={24} />
+              </button>
+              <img src={previewImage} alt="preview" className="max-w-full max-h-full object-contain shadow-2xl rounded-sm animate-in zoom-in-95" onClick={e => e.stopPropagation()} />
           </div>
       )}
     </div>

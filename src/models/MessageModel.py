@@ -26,20 +26,21 @@ class MessageModel:
         limit: int = 50,
         since: Optional[datetime] = None,
     ):
-        """
-        Get messages for a channel, sorted oldest-first.
-
-        Args:
-            channel_id: The channel's string ObjectId.
-            skip: Number of messages to skip (for pagination when loading earlier).
-            limit: Maximum number of messages to return (1–200).
-            since: If provided, only return messages created AFTER this datetime.
-                   Used for efficient polling — the client sends the timestamp of
-                   its newest known message and only receives new ones.
-        """
         db = get_db()
 
-        query: dict = {"channel_id": channel_id}
+        # Robustness: Handle both string and ObjectId formats for channel_id
+        cid_query = [channel_id]
+        try:
+            cid_query.append(ObjectId(channel_id))
+        except:
+            pass
+
+        query: dict = {
+            "$or": [
+                {"channel_id": {"$in": cid_query}},
+                {"channelId": {"$in": cid_query}}
+            ]
+        }
         if since is not None:
             query["created_at"] = {"$gt": since}
 
@@ -58,9 +59,13 @@ class MessageModel:
 
     @classmethod
     async def count_by_channel(cls, channel_id: str) -> int:
-        """Return the total number of messages in a channel (for pagination metadata)."""
         db = get_db()
-        return await db[cls.collection_name].count_documents({"channel_id": channel_id})
+        cid_query = [channel_id]
+        try:
+            cid_query.append(ObjectId(channel_id))
+        except:
+            pass
+        return await db[cls.collection_name].count_documents({"channel_id": {"$in": cid_query}})
 
     @classmethod
     async def get_by_id(cls, message_id: str):
@@ -92,5 +97,23 @@ class MessageModel:
     async def delete_by_channel(cls, channel_id: str):
         """Delete all messages in a channel (used when a channel is deleted)."""
         db = get_db()
-        result = await db[cls.collection_name].delete_many({"channel_id": channel_id})
+        
+        cid_str = channel_id
+        cid_oid = None
+        try:
+            cid_oid = ObjectId(channel_id)
+        except:
+            pass
+            
+        cid_query = [cid_str]
+        if cid_oid:
+            cid_query.append(cid_oid)
+            
+        result = await db[cls.collection_name].delete_many({
+            "$or": [
+                {"channel_id": {"$in": cid_query}},
+                {"channelId": {"$in": cid_query}},
+                {"channel": {"$in": cid_query}}
+            ]
+        })
         return result.deleted_count

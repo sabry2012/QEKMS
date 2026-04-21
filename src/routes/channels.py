@@ -530,6 +530,44 @@ async def get_channel_messages(
     }
 
 
+@channel_router.delete("/{channel_id}/messages")
+async def clear_channel_messages(
+    channel_id: str,
+    user: dict = Depends(get_current_user_from_cookie),
+):
+    """
+    Permanently delete all messages in a specific channel.
+    Authorized for Admins or Channel Participants.
+    """
+    logger.info(f"CLEAR_CHAT requested for channel: {channel_id} by {user.get('sub')}")
+    channel = await ChannelModel.get_by_id(channel_id)
+    if not channel:
+        logger.warning(f"CLEAR_CHAT failed: Channel {channel_id} not found.")
+        raise HTTPException(status_code=404, detail="Channel not found.")
+
+    user_email = user["sub"]
+    if user["role"] != "admin" and user_email not in [channel.get("sender"), channel.get("receiver")] + channel.get("members", []):
+        logger.warning(f"CLEAR_CHAT denied: User {user_email} not authorized for channel {channel_id}")
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    deleted_count = await MessageModel.delete_by_channel(channel_id)
+    logger.info(f"CLEAR_CHAT finalized: deleted {deleted_count} messages in channel {channel_id}")
+    
+    await AuditService.log(
+        "MESSAGES_CLEARED",
+        user_id=user_email,
+        details={
+            "channel_id": channel_id,
+            "deleted_count": deleted_count,
+        },
+    )
+    
+    # Broadcast clear event to active sockets
+    await chat_manager.broadcast(channel_id, {"type": "messages_cleared", "channel_id": channel_id})
+    
+    return {"message": "Channel history cleared successfully.", "deleted_count": deleted_count}
+
+
 @channel_router.post("/{channel_id}/send")
 async def send_secure_message(
     channel_id: str,
