@@ -460,17 +460,32 @@ export default function Dashboard() {
 
   const handleClearChat = async (channelId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to PERMANENTLY delete all messages in this tunnel?')) return;
+    const isAdmin = user?.role === 'admin';
+    const confirmMsg = isAdmin 
+      ? 'WARNING: You are about to PERMANENTLY delete this chat history for ALL participants. Continue?' 
+      : 'Clear chat history for your account? (This won\'t affect the other participant)';
+
+    if (!window.confirm(confirmMsg)) return;
+
     try {
-        const { data } = await api.delete(`/channels/${channelId}/messages`);
-        console.log(`[Dashboard] Clear Chat Result: ${data.deleted_count} messages deleted.`);
+        if (isAdmin) {
+          // Global Delete for Admin
+          const { data } = await api.delete(`/channels/${channelId}/messages`);
+          console.log(`[Dashboard] Admin Global Clear: ${data.deleted_count} messages deleted.`);
+        } else {
+          // Selective Clear for Client
+          await api.post(`/channels/${channelId}/clear`);
+          console.log(`[Dashboard] History cleared for user.`);
+        }
+
         if (activeChannel?.id === channelId) {
             setMessages([]);
         }
-    } catch (err) { 
+    } catch (err: any) { 
         console.error("[Dashboard] Failed to clear history:", err);
-        setMessageError("Failed to purge tunnel history");
-        setTimeout(() => setMessageError(''), 3000);
+        const detail = err.response?.data?.detail || "Protocol Interruption Detected";
+        setMessageError(`FAILED: ${detail}`);
+        setTimeout(() => setMessageError(''), 5000);
     }
   };
 

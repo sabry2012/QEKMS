@@ -534,9 +534,21 @@ async def get_channel_messages(
         raise HTTPException(status_code=403, detail="Access denied.")
 
     since_dt = None
+    
+    # 1. Respect user's cleared_at timestamp
+    safe_email = user_email.replace('.', '_')
+    if channel.get("cleared_at") and channel["cleared_at"].get(safe_email):
+        since_dt = channel["cleared_at"][safe_email]
+        # If the ISO format was stored as string, convert it
+        if isinstance(since_dt, str):
+            since_dt = datetime.fromisoformat(since_dt.replace("Z", "+00:00")).replace(tzinfo=None)
+
+    # 2. Overlap with provided 'since' parameter if any
     if since:
         try:
-            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00")).replace(tzinfo=None)
+            param_since = datetime.fromisoformat(since.replace("Z", "+00:00")).replace(tzinfo=None)
+            if not since_dt or param_since > since_dt:
+                since_dt = param_since
         except Exception as e:
             logger.warning(f"Invalid 'since' format received: {since}. Error: {e}")
 
@@ -569,9 +581,9 @@ async def clear_channel_messages(
         raise HTTPException(status_code=404, detail="Channel not found.")
 
     user_email = user["sub"]
-    if user["role"] != "admin" and user_email not in [channel.get("sender"), channel.get("receiver")] + channel.get("members", []):
-        logger.warning(f"CLEAR_CHAT denied: User {user_email} not authorized for channel {channel_id}")
-        raise HTTPException(status_code=403, detail="Access denied.")
+    if user["role"] != "admin":
+        logger.warning(f"CLEAR_CHAT denied: User {user_email} is not an administrator.")
+        raise HTTPException(status_code=403, detail="Only administrators can permanently delete history for all participants.")
 
     deleted_count = await MessageModel.delete_by_channel(channel_id)
     logger.info(f"CLEAR_CHAT finalized: deleted {deleted_count} messages in channel {channel_id}")
@@ -588,7 +600,35 @@ async def clear_channel_messages(
     # Broadcast clear event to active sockets
     await chat_manager.broadcast(channel_id, {"type": "messages_cleared", "channel_id": channel_id})
     
-    return {"message": "Channel history cleared successfully.", "deleted_count": deleted_count}
+    return {"message": "Channel history permanently deleted by administrator.", "deleted_count": deleted_count}
+
+
+@channel_router.post("/{channel_id}/clear")
+async def clear_chat_for_me(
+    channel_id: str,
+    user: dict = Depends(get_current_user_from_cookie),
+):
+    """
+    Hides all existing messages for the calling user.
+    Messages sent after this call will be visible.
+    """
+    user_email = user["sub"]
+    channel = await ChannelModel.get_by_id(channel_id)
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found.")
+
+    if user["role"] != "admin" and user_email not in [channel.get("sender"), channel.get("receiver")] + channel.get("members", []):
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    await ChannelModel.clear_history(channel_id, user_email)
+    
+    await AuditService.log(
+        "CHAT_CLEARED_BY_USER",
+        user_id=user_email,
+        details={"channel_id": channel_id},
+    )
+    
+    return {"message": "History cleared for your account content successfully."}
 
 
 @channel_router.post("/{channel_id}/send")

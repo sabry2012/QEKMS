@@ -20,6 +20,9 @@ class ChannelModel:
         channel_data["key_max_usage"] = 1000 # Rotate after 1000 messages
         channel_data["key_expires_at"] = None # Optional TTL
         
+        channel_data.setdefault("cleared_at", {})
+        channel_data.setdefault("unread_counts", {})
+        
         # 'keys' is a dict mapping version (str) to key metadata
         # Actual key content is stored in 'master_key_bin' or similar
         # For now we use the provided data but we'll adapt to versioning
@@ -225,4 +228,20 @@ class ChannelModel:
                     {"_id": ch["_id"]},
                     {"$set": {"is_active": channel_should_be_active}}
                 )
+
+    @classmethod
+    async def clear_history(cls, channel_id: str, email: str):
+        """Sets the cleared_at timestamp for a specific user in a channel."""
+        try:
+            oid = ObjectId(channel_id)
+        except (InvalidId, TypeError):
+            return False
+        db = get_db()
+        # Use sanitized email key (replace dots)
+        safe_email = email.replace('.', '_')
+        await db[cls.collection_name].update_one(
+            {"_id": oid},
+            {"$set": {f"cleared_at.{safe_email}": datetime.utcnow()}}
+        )
+        return True
 
