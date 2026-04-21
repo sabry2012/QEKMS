@@ -124,17 +124,18 @@ def _normalize_key(key: bytes) -> bytes:
     return key + b'\x00' * (32 - len(key))
 
 
-def _validate_file(file: UploadFile, file_bytes: bytes) -> str:
+def _validate_file(file: UploadFile, file_bytes: bytes, max_size_mb: int = 20) -> str:
     """
     Validate an uploaded file.
     Returns the determined message type ('image', 'video', 'file').
     Raises HTTPException on validation failure.
     """
     # Size check
-    if len(file_bytes) > MAX_FILE_SIZE_BYTES:
+    limit_bytes = max_size_mb * 1024 * 1024
+    if len(file_bytes) > limit_bytes:
         raise HTTPException(
             status_code=413,
-            detail=f"File too large. Maximum allowed size is {MAX_FILE_SIZE_BYTES // (1024*1024)} MB.",
+            detail=f"File too large for your current plan. Maximum allowed size is {max_size_mb} MB.",
         )
 
     # Extension check
@@ -608,6 +609,22 @@ async def send_secure_message(
     user_email = user["sub"]
     
     receiver_email = channel.get("receiver") if channel.get("sender") == user_email else channel.get("sender")
+    sender = None
+    if user["role"] != "admin":
+        sender = await AccountModel.get_by_email(user_email)
+        if sender:
+            plan = sender.get("plan", DEFAULT_PLAN)
+            limits = PLAN_LIMITS.get(plan, PLAN_LIMITS[DEFAULT_PLAN])
+            enc_limit = limits.get("encryption_limit", 100)
+            
+            if enc_limit != -1:
+                current_enc = sender.get("encryptions_performed", 0)
+                if current_enc >= enc_limit:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Monthly encryption operation limit reached ({current_enc}/{enc_limit}). Please upgrade for more bandwidth."
+                    )
+
     if receiver_email:
         receiver_user = await AccountModel.get_by_email(receiver_email) or await AdminModel.get_by_email(receiver_email)
         if not receiver_user:
@@ -678,6 +695,11 @@ async def send_secure_message(
         },
     )
     
+    # Increment encryption count for matching subscription logic
+    if user["role"] != "admin" and sender:
+        new_enc_total = sender.get("encryptions_performed", 0) + 1
+        await AccountModel.update(sender["id"], {"encryptions_performed": new_enc_total})
+
     if receiver_email:
         await ChannelModel.increment_unread(channel_id, receiver_email)
         # Broadcast the unread increment explicitly so clients can update their badges without refreshing
@@ -717,8 +739,19 @@ async def upload_channel_file(
     ):
         raise HTTPException(status_code=403, detail="Access denied.")
 
+    # Fetch Plan for file size limit
+    max_size_mb = 10 # Default
+    if user["role"] != "admin":
+        sender = await AccountModel.get_by_email(user_email)
+        if sender:
+            plan = sender.get("plan", DEFAULT_PLAN)
+            limits = PLAN_LIMITS.get(plan, PLAN_LIMITS[DEFAULT_PLAN])
+            max_size_mb = limits.get("max_file_size_mb", 10)
+    else:
+        max_size_mb = 250 # Admin fixed limit
+
     file_bytes = await file.read()
-    msg_type = _validate_file(file, file_bytes)
+    msg_type = _validate_file(file, file_bytes, max_size_mb=max_size_mb)
 
     ext = os.path.splitext(file.filename or "file")[1].lower() or ".bin"
     unique_name = f"{uuid.uuid4()}{ext}"

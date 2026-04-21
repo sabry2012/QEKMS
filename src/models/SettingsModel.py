@@ -1,25 +1,42 @@
 from src.helpers.database import get_db
 
 
-# Plans available for internal user creation by admins
+# Plans available for internal user creation and clients
 PLAN_LIMITS = {
-    "free": {"channels_limit": 5, "encryption_limit": 50},
-    "professional": {"channels_limit": 50, "encryption_limit": 500},
-    "enterprise": {"channels_limit": -1, "encryption_limit": -1},  # -1 = unlimited
+    "starter": {
+        "channels_limit": 10, 
+        "encryption_limit": 100,
+        "max_users_per_channel": 2,
+        "max_file_size_mb": 10,
+        "priority_level": "standard"
+    },
+    "professional": {
+        "channels_limit": 50, 
+        "encryption_limit": 500,
+        "max_users_per_channel": 10,
+        "max_file_size_mb": 50,
+        "priority_level": "high"
+    },
+    "enterprise": {
+        "channels_limit": -1, # -1 = unlimited
+        "encryption_limit": -1,
+        "max_users_per_channel": -1,
+        "max_file_size_mb": 250,
+        "priority_level": "mission-critical"
+    },  
 }
 
-DEFAULT_PLAN = "free"
+DEFAULT_PLAN = "starter"
 
-# Plans available for CLIENT ACCESS REQUESTS (paid-only, no free tier)
-CLIENT_PLANS = ["pro", "enterprise"]
+# Plans available for CLIENT ACCESS REQUESTS
+CLIENT_PLANS = ["starter", "professional", "enterprise"]
 
 # Subscription durations in days per plan
 PLAN_DURATION_DAYS = {
-    "free": 30,
-    "pro": 365,
+    "starter": 30,
+    "professional": 365,
     "enterprise": 365,
 }
-
 
 
 class SettingsModel:

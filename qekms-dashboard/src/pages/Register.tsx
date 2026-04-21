@@ -11,13 +11,13 @@ import { Card } from '../components/ui/Card';
 
 const PLANS = [
   {
-    id: 'free',
-    name: 'Free Node',
-    price: '$0',
-    period: '/Forever',
+    id: 'starter',
+    name: 'Starter Node',
+    price: '$29',
+    period: '/mo',
   },
   {
-    id: 'pro',
+    id: 'professional',
     name: 'Professional',
     price: '$49',
     period: '/mo',
@@ -36,7 +36,7 @@ export default function Register() {
     company: '',
     email: '',
     phone: '',
-    plan: 'pro',
+    plan: 'professional',
     notes: '',
   });
   const [error, setError] = useState('');

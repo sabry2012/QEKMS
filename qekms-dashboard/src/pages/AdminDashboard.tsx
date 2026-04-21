@@ -279,6 +279,13 @@ export default function AdminDashboard() {
   const audioChunksRef = useRef<Blob[]>([]);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Filter States
+  const [overviewClientFilter, setOverviewClientFilter] = useState('all');
+  const [overviewUserFilter, setOverviewUserFilter] = useState('all');
+  const [usersFilter, setUsersFilter] = useState('all');
+  const [clientsFilter, setClientsFilter] = useState('all');
+  const [showDeletedClients, setShowDeletedClients] = useState(false);
+
   // ── Fetch ────────────────────────────────────────────────────────────
   const fetchStats = useCallback(async () => { try { const { data } = await api.get('/admin/clients/stats'); setStats(data); } catch { } }, []);
   const fetchUsers = useCallback(async () => { try { const { data } = await api.get('/admin/users'); setUsers(data); } catch { } }, []);
@@ -379,6 +386,12 @@ export default function AdminDashboard() {
     await handleAction(`/admin/reset-password/${resetUser.id}`, 'post', { new_password: newPassword });
     setResetUser(null);
     setNewPassword('');
+  };
+
+  const handleForceRecalibrate = async () => {
+    await handleAction('/admin/quantum/recalibrate', 'post');
+    // Re-fetch health immediately to get updated entropy metrics
+    fetchSysHealth();
   };
 
   // ── MESSAGING LOGIC ──
@@ -571,8 +584,24 @@ export default function AdminDashboard() {
     }
   };
 
-  const totalRevenue = clients.filter(c => c.status === 'approved' || c.amount).reduce((a, c) => a + (c.amount || 0), 0);
-  const pendingCount = clients.filter(c => c.status === 'pending').length;
+  // ── COMPUTED FILTERS ──
+  const activeClientsArray = clients.filter(c => !(c as any).is_deleted);
+  
+  const filteredOverviewClients = activeClientsArray
+    .filter(c => overviewClientFilter === 'all' ? true : c.status === overviewClientFilter);
+
+  const filteredOverviewUsers = users
+    .filter(u => overviewUserFilter === 'all' ? true : (overviewUserFilter === 'active' ? u.is_active : !u.is_active));
+
+  const filteredOperators = users
+    .filter(u => usersFilter === 'all' ? true : (usersFilter === 'admin' ? u.role === 'admin' : u.plan === usersFilter));
+
+  const filteredClientsList = clients
+    .filter(c => showDeletedClients ? true : !(c as any).is_deleted)
+    .filter(c => clientsFilter === 'all' ? true : c.status === clientsFilter);
+
+  const totalRevenue = activeClientsArray.filter(c => c.status === 'approved' || c.amount).reduce((a, c) => a + (c.amount || 0), 0);
+  const pendingCount = activeClientsArray.filter(c => c.status === 'pending').length;
 
   const statCards = [
     { label: 'Total Nodes', value: stats.total_users, icon: Users, color: 'text-primary-cyan', bg: 'bg-primary-cyan/15', border: 'border-primary-cyan/25' },
@@ -708,10 +737,21 @@ export default function AdminDashboard() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div className="space-y-4">
-                    <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-3">
-                      <UserPlus size={16} /> Latest Mesh Requests
-                    </h3>
-                    {clients.slice(0, 4).map(c => (
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.3em] flex items-center gap-3 m-0">
+                        <UserPlus size={16} /> Latest Mesh Requests
+                      </h3>
+                      <select 
+                        value={overviewClientFilter} onChange={e => setOverviewClientFilter(e.target.value)}
+                        className="bg-black/20 border border-white/5 rounded-lg text-[9px] font-black text-gray-400 px-3 py-1 outline-none uppercase tracking-widest cursor-pointer"
+                      >
+                        <option value="all">ALL</option>
+                        <option value="pending">PENDING</option>
+                        <option value="approved">APPROVED</option>
+                        <option value="rejected">REJECTED</option>
+                      </select>
+                    </div>
+                    {filteredOverviewClients.slice(0, 4).map(c => (
                       <div key={c.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
                         <div>
                           <p className="m-0 text-[14px] font-black text-white tracking-tight">{c.full_name}</p>
@@ -723,10 +763,20 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-3">
-                      <Users size={16} /> Distributed Operators
-                    </h3>
-                    {users.slice(0, 4).map(u => (
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.3em] flex items-center gap-3 m-0">
+                        <Users size={16} /> Distributed Operators
+                      </h3>
+                      <select 
+                        value={overviewUserFilter} onChange={e => setOverviewUserFilter(e.target.value)}
+                        className="bg-black/20 border border-white/5 rounded-lg text-[9px] font-black text-gray-400 px-3 py-1 outline-none uppercase tracking-widest cursor-pointer"
+                      >
+                        <option value="all">ALL</option>
+                        <option value="active">ACTIVE</option>
+                        <option value="inactive">INACTIVE</option>
+                      </select>
+                    </div>
+                    {filteredOverviewUsers.slice(0, 4).map(u => (
                       <div key={u.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
                         <div className="flex items-center gap-4">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${u.is_active ? 'bg-primary-cyan/15' : 'bg-gray-500/15'}`}>
@@ -753,9 +803,21 @@ export default function AdminDashboard() {
                     <h2 className="m-0 text-xl font-black text-white uppercase tracking-tight">Mesh Operators</h2>
                     <p className="m-0 mt-2 text-[10px] text-gray-500 font-bold uppercase tracking-widest">Global distributed identity management & key provisioning.</p>
                   </div>
-                  <Button onClick={() => setShowAddForm(!showAddForm)} className="h-12 px-8 shadow-mesh-glow">
-                    <Plus size={16} className="mr-2" /> Deploy New Node
-                  </Button>
+                  <div className="flex items-center gap-4">
+                    <select 
+                      value={usersFilter} onChange={e => setUsersFilter(e.target.value)}
+                      className="bg-black/40 border border-white/10 rounded-xl text-xs font-bold text-gray-300 px-4 h-12 outline-none uppercase"
+                    >
+                      <option value="all">ALL OPERATORS</option>
+                      <option value="admin">ADMINISTRATORS</option>
+                      <option value="starter">STARTER</option>
+                      <option value="professional">PROFESSIONAL</option>
+                      <option value="enterprise">ENTERPRISE</option>
+                    </select>
+                    <Button onClick={() => setShowAddForm(!showAddForm)} className="h-12 px-8 shadow-mesh-glow">
+                      <Plus size={16} className="mr-2" /> Deploy New Node
+                    </Button>
+                  </div>
                 </div>
 
                 <AnimatePresence>
@@ -777,7 +839,7 @@ export default function AdminDashboard() {
                               className="w-full bg-black/40 border border-white/10 rounded-xl text-xs font-bold text-white px-4 h-12 outline-none focus:border-primary-cyan/50"
                               value={newUser.plan} onChange={e => setNewUser({ ...newUser, plan: e.target.value })}
                             >
-                              <option value="free">FREE NODE</option>
+                              <option value="starter">STARTER NODE</option>
                               <option value="professional">PROFESSIONAL</option>
                               <option value="enterprise">ENTERPRISE (∞)</option>
                             </select>
@@ -790,7 +852,7 @@ export default function AdminDashboard() {
                 </AnimatePresence>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {users.map(user => (
+                  {filteredOperators.map(user => (
                     <Card key={user.id} className="p-6 flex items-center justify-between border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all group">
                       <div className="flex items-center gap-5 overflow-hidden">
                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-inner transition-transform duration-500 group-hover:scale-110 ${user.is_active ? 'bg-primary-cyan/10' : 'bg-gray-500/10'}`}>
@@ -1033,6 +1095,14 @@ export default function AdminDashboard() {
                                       <p className="m-0 text-[13px] leading-snug font-medium break-words">
                                         {m.content}
                                       </p>
+                                      {!isMe && m.content !== '[DECRYPTION ERROR]' && (
+                                        <div className="flex items-center gap-1 mt-1 opacity-80 text-[8px] font-black uppercase tracking-widest text-emerald-400 group/hmac relative cursor-help w-max">
+                                          <CheckCircle2 size={10} /> VERIFIED SECURE
+                                          <div className="absolute bottom-full left-0 mb-1 hidden group-hover/hmac:block w-max bg-black/90 text-white text-[9px] px-2 py-1 rounded shadow-lg border border-white/10 z-50">
+                                            HMAC Valid • Decryption Successful
+                                          </div>
+                                        </div>
+                                      )}
                                       <div className="flex items-center justify-end gap-1 opacity-30 text-[8px] font-black uppercase tracking-widest mt-1">
                                         {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         <Lock size={8} />
@@ -1121,13 +1191,32 @@ export default function AdminDashboard() {
             {/* ── CLIENTS TAB ── */}
             {activeTab === 'clients' && (
               <div>
-                <div className="mb-8">
-                  <h2 className="m-0 text-xl font-black text-white uppercase tracking-tight">Mesh Provisioning Queue</h2>
-                  <p className="m-0 mt-2 text-[10px] text-gray-500 font-bold uppercase tracking-widest">Authentication and clearance validation for incoming node identifiers.</p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
+                  <div>
+                    <h2 className="m-0 text-xl font-black text-white uppercase tracking-tight">Mesh Provisioning Queue</h2>
+                    <p className="m-0 mt-2 text-[10px] text-gray-500 font-bold uppercase tracking-widest">Authentication and clearance validation for incoming node identifiers.</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => setShowDeletedClients(!showDeletedClients)}
+                      className={`h-12 px-6 rounded-xl font-black text-xs uppercase tracking-widest transition-all cursor-pointer border ${showDeletedClients ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-white/5 text-gray-400 border-white/5'}`}
+                    >
+                      {showDeletedClients ? 'Hide Deleted' : 'Show Deleted'}
+                    </button>
+                    <select 
+                      value={clientsFilter} onChange={e => setClientsFilter(e.target.value)}
+                      className="bg-black/40 border border-white/10 rounded-xl text-xs font-bold text-gray-300 px-4 h-12 outline-none uppercase"
+                    >
+                      <option value="all">ALL REQUESTS</option>
+                      <option value="pending">PENDING</option>
+                      <option value="approved">APPROVED</option>
+                      <option value="rejected">REJECTED</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {clients.map(client => (
+                  {filteredClientsList.map(client => (
                     <Card key={client.id} className="p-6 flex flex-col gap-6 border-white/5 bg-white/[0.03] relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-20 transition-opacity">
                         <CreditCard size={60} className="text-primary-cyan" />
@@ -1135,10 +1224,24 @@ export default function AdminDashboard() {
 
                       <div className="flex justify-between items-start relative z-10">
                         <div className="space-y-1">
-                          <p className="m-0 text-[18px] font-black text-white tracking-tight">{client.full_name}</p>
+                          <p className="m-0 text-[18px] font-black text-white tracking-tight flex items-center gap-2">
+                             {client.full_name}
+                             {(client as any).is_deleted && <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-500 text-[8px] uppercase tracking-widest">DELETED</span>}
+                          </p>
                           <p className="m-0 text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">{client.company}</p>
                         </div>
-                        <StatusBadge status={client.status} />
+                        <div className="flex flex-col items-end gap-2">
+                          <StatusBadge status={client.status} />
+                          {!(client as any).is_deleted && (
+                            <button 
+                              onClick={() => handleAction(`/admin/clients/${client.id}`, 'delete')}
+                              className="text-gray-500 hover:text-red-500 bg-transparent border-none cursor-pointer transition-colors"
+                              title="Delete Request"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex gap-2 flex-wrap pb-2 border-b border-white/5 relative z-10">
@@ -1244,7 +1347,22 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     </div>
-                    <Button className="h-14 font-black uppercase tracking-widest bg-violet-600 hover:bg-violet-700 shadow-mesh-glow shadow-violet-600/20">
+                    {quantumHealth?.last_entropy_result?.previous_quality && (
+                      <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 mb-4 space-y-2">
+                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
+                          <span>Previous Quality</span>
+                          <span>{quantumHealth.last_entropy_result.previous_quality}%</span>
+                        </div>
+                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-primary-cyan">
+                          <span>New Quality</span>
+                          <span>{quantumHealth.last_entropy_result.quality}%</span>
+                        </div>
+                        <div className="text-[8px] text-right font-mono text-gray-600 mt-2">
+                          Recalibrated: {new Date(quantumHealth.last_entropy_result.recalibrated_at || '').toLocaleString()}
+                        </div>
+                      </div>
+                    )}
+                    <Button onClick={handleForceRecalibrate} className="h-14 font-black uppercase tracking-widest bg-violet-600 hover:bg-violet-700 shadow-mesh-glow shadow-violet-600/20" isLoading={loading}>
                       <Zap size={18} className="mr-3" /> Force Recalibration
                     </Button>
                   </Card>

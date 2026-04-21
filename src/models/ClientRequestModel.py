@@ -13,6 +13,7 @@ class ClientRequestModel:
         db = get_db()
         data.setdefault("status", "pending")
         data.setdefault("payment_status", "pending")
+        data.setdefault("is_deleted", False)
         data.setdefault("created_at", datetime.utcnow())
         result = await db[cls.collection_name].insert_one(data)
         data["id"] = str(result.inserted_id)
@@ -66,4 +67,4 @@ class ClientRequestModel:
     @classmethod
     async def count_by_status(cls, status: str) -> int:
         db = get_db()
-        return await db[cls.collection_name].count_documents({"status": status})
+        return await db[cls.collection_name].count_documents({"status": status, "is_deleted": {"$ne": True}})

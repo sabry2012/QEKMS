@@ -4,7 +4,19 @@ from fastapi import APIRouter, HTTPException
 from src.models.ClientRequestModel import ClientRequestModel
 from src.models.AccountModel import AccountModel
 from src.models.ModelsSchemas.ClientRequestSchema import ClientRequestCreate
-from src.models.SettingsModel import CLIENT_PLANS
+from src.models.SettingsModel import PLAN_LIMITS # Added for potential future parity
+CLIENT_PLANS = ["starter", "professional", "enterprise"] # Explicitly in sync with frontend
+from email_validator import validate_email, EmailNotValidError
+
+logger = logging.getLogger(__name__)
+
+# Basic list of known active disposable domains
+DISPOSABLE_DOMAINS = {
+    "tempmail.com", "10minutemail.com", "guerrillamail.com", "dropmail.me", 
+    "yopmail.com", "mailinator.com", "temp-mail.org", "trashmail.com", 
+    "getnada.com", "sharklasers.com", "dispostable.com"
+}
+
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +34,23 @@ async def submit_access_request(data: ClientRequestCreate):
     if data.plan not in CLIENT_PLANS:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid plan '{data.plan}'. Available plans: {CLIENT_PLANS}",
+            detail=f"DEBUG_VALIDATION: Plan '{data.plan}' is not in the system registry. Registry contains: {CLIENT_PLANS}",
         )
 
+    # Validate Email via Syntax and MX checks
+    try:
+        email_info = validate_email(str(data.email), check_deliverability=True)
+        domain = email_info.domain.lower()
+        if domain in DISPOSABLE_DOMAINS or any(d in domain for d in ["temp", "disposable", "throwaway", "10minute"]):
+            raise HTTPException(status_code=400, detail="Disposable or temporary email addresses are strictly prohibited for enterprise network nodes.")
+        
+        # Override with normalized email
+        clean_email = email_info.normalized
+    except EmailNotValidError as e:
+        raise HTTPException(status_code=400, detail=f"Email Validation Failed: {str(e)}")
+
     # Check for existing active (non-rejected) request with same email
-    existing = await ClientRequestModel.get_by_email(str(data.email))
+    existing = await ClientRequestModel.get_by_email(clean_email)
     if existing and existing.get("status") != "rejected":
         raise HTTPException(
             status_code=409,
@@ -39,7 +63,7 @@ async def submit_access_request(data: ClientRequestCreate):
 
     # Check if user is already provisioned
     from src.models.AccountModel import AccountModel as AM
-    already_user = await AM.get_by_email(str(data.email))
+    already_user = await AM.get_by_email(clean_email)
     if already_user:
         raise HTTPException(
             status_code=409,
@@ -49,7 +73,7 @@ async def submit_access_request(data: ClientRequestCreate):
     doc = {
         "full_name": data.full_name.strip(),
         "company": data.company.strip(),
-        "email": str(data.email).lower(),
+        "email": clean_email,
         "phone": data.phone.strip(),
         "plan": data.plan,
         "notes": (data.notes or "").strip(),

@@ -99,6 +99,18 @@ class QEKMS_service:
             "generated_keys": self.generated_keys_count,
         }
 
+    async def force_recalibrate(self, user_id: str = "unknown"):
+        """Forcibly generate a throwaway key just to recalibrate entropy/jitter."""
+        previous_quality = self.last_entropy_result.get("quality") if self.last_entropy_result else None
+        
+        # Generation process automatically updates last_entropy_result
+        await self.generate_key(user_id=user_id)
+        
+        if self.last_entropy_result:
+            self.last_entropy_result["recalibrated_at"] = datetime.now(timezone.utc).isoformat()
+            if previous_quality is not None:
+                self.last_entropy_result["previous_quality"] = previous_quality
+
     async def generate_key(self, user_id: str = "unknown") -> bytes:
         """Generate a cryptographically random 256-bit key using a quantum circuit with validation."""
         target_bits = 256

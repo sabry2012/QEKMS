@@ -75,6 +75,9 @@ async def list_all_users():
         limits = PLAN_LIMITS.get(plan, PLAN_LIMITS[DEFAULT_PLAN])
         acc["channels_limit"] = limits["channels_limit"]
         acc["encryption_limit"] = limits["encryption_limit"]
+        acc["max_users_per_channel"] = limits.get("max_users_per_channel", 2)
+        acc["max_file_size_mb"] = limits.get("max_file_size_mb", 10)
+        acc["priority_level"] = limits.get("priority_level", "standard")
         acc["channels_created_total"] = acc.get("channels_created_total", 0)
         users.append(acc)
     for adm in admins:
@@ -83,6 +86,9 @@ async def list_all_users():
         adm["plan"] = "enterprise"
         adm["channels_limit"] = -1
         adm["encryption_limit"] = -1
+        adm["max_users_per_channel"] = -1
+        adm["max_file_size_mb"] = 250
+        adm["priority_level"] = "mission-critical"
         adm["channels_created_total"] = "∞"
         users.append(adm)
 
@@ -125,6 +131,9 @@ async def admin_create_user(data: CreateUserRequest):
             "plan": data.plan,
             "channels_limit": limits["channels_limit"],
             "encryption_limit": limits["encryption_limit"],
+            "max_users_per_channel": limits.get("max_users_per_channel", 2),
+            "max_file_size_mb": limits.get("max_file_size_mb", 10),
+            "priority_level": limits.get("priority_level", "standard"),
             "subscription_status": "active",
             "subscription_start": now,
             "subscription_end": now + timedelta(days=duration),
@@ -226,6 +235,9 @@ async def admin_upgrade_user(user_id: str, data: UpgradeUserRequest):
         "plan": data.plan,
         "channels_limit": limits["channels_limit"],
         "encryption_limit": limits["encryption_limit"],
+        "max_users_per_channel": limits.get("max_users_per_channel", 2),
+        "max_file_size_mb": limits.get("max_file_size_mb", 10),
+        "priority_level": limits.get("priority_level", "standard"),
         "subscription_status": "active",
         "subscription_start": now,
         "subscription_end": now + timedelta(days=duration),
@@ -412,6 +424,9 @@ async def admin_approve_client(request_id: str, request: Request, admin=Depends(
         "plan": plan,
         "channels_limit": limits["channels_limit"],
         "encryption_limit": limits["encryption_limit"],
+        "max_users_per_channel": limits.get("max_users_per_channel", 2),
+        "max_file_size_mb": limits.get("max_file_size_mb", 10),
+        "priority_level": limits.get("priority_level", "standard"),
         "subscription_status": "active",
         "subscription_start": now,
         "subscription_end": now + timedelta(days=duration),
@@ -488,6 +503,26 @@ async def admin_reject_client(request_id: str, request: Request, data: Optional[
         )
 
     return {"message": "Request rejected.", "reason": reason}
+
+@admin_router.delete("/clients/{request_id}", dependencies=[Depends(require_admin)])
+async def admin_delete_client_request(request_id: str, request: Request, admin=Depends(require_admin)):
+    req = await ClientRequestModel.get_by_id(request_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="Client request not found")
+        
+    updated = await ClientRequestModel.update(request_id, {"is_deleted": True})
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to delete request")
+    
+    await AuditService.log_event(
+        event="CLIENT_REQUEST_SOFT_DELETED",
+        user_id=admin.get("id", "admin"),
+        ip=request.client.host,
+        severity="WARN",
+        metadata={"request_id": request_id, "email": req.get("email")}
+    )
+    return {"message": "Request soft-deleted successfully."}
+
 @admin_router.get("/audit-logs", dependencies=[Depends(require_admin)])
 async def list_audit_logs(
     severity: Optional[str] = Query(None),
@@ -508,3 +543,18 @@ async def get_quantum_health(request: Request):
     """Retrieve the current health and metrics of the Quantum Key Management System."""
     qekms = request.app.QEKMS_service
     return qekms.get_quantum_status()
+
+@admin_router.post("/quantum/recalibrate", dependencies=[Depends(require_admin)])
+async def admin_quantum_recalibrate(request: Request, admin=Depends(require_admin)):
+    """Force a recalibration of the quantum entropy source."""
+    qekms = request.app.QEKMS_service
+    await qekms.force_recalibrate(user_id=admin.get("sub", "System"))
+    
+    await AuditService.log_event(
+        event="QUANTUM_RECALIBRATION",
+        user_id=admin.get("id", "admin"),
+        ip=request.client.host,
+        severity="INFO",
+        metadata={"action": "forced_recalibration"}
+    )
+    return {"message": "Quantum entropy recalibrated"}
