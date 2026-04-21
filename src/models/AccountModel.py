@@ -48,6 +48,10 @@ class AccountModel:
             account_data["email"] = account_data["email"].strip().lower()
         if "last_seen" not in account_data:
             account_data["last_seen"] = None
+        if "channels_created_total" not in account_data:
+            account_data["channels_created_total"] = 0
+        if "plan" not in account_data:
+            account_data["plan"] = "free"
 
         result = await db[cls.collection_name].insert_one(account_data)
         account_data["id"] = str(result.inserted_id)

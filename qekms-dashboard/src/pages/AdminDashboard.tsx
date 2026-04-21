@@ -37,6 +37,7 @@ interface User {
   role: string;
   plan: string;
   is_active: boolean;
+  channels_created_total?: number;
 }
 
 interface ClientRequest {
@@ -224,7 +225,7 @@ const VoiceNote = ({ url, isMe, timestamp }: { url: string, isMe: boolean, times
 // ─────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const { logout, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'clients' | 'channels' | 'messages' | 'audit' | 'health' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'clients' | 'messages' | 'audit' | 'health'>('overview');
 
   // Data
   const [users, setUsers] = useState<User[]>([]);
@@ -244,7 +245,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'account', plan: 'pro' });
+  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'account', plan: 'professional' });
 
   // Payment/Provisioning State
   const [verifyingClient, setVerifyingClient] = useState<ClientRequest | null>(null);
@@ -587,8 +588,6 @@ export default function AdminDashboard() {
     { key: 'messages', label: 'Messages', icon: MessageSquare },
     { key: 'health', label: 'Quantum', icon: Zap },
     { key: 'audit', label: 'Audit', icon: Activity },
-    { key: 'channels', label: 'Mesh', icon: Radio },
-    { key: 'settings', label: 'Config', icon: Settings },
   ] as const;
 
   return (
@@ -778,7 +777,8 @@ export default function AdminDashboard() {
                               className="w-full bg-black/40 border border-white/10 rounded-xl text-xs font-bold text-white px-4 h-12 outline-none focus:border-primary-cyan/50"
                               value={newUser.plan} onChange={e => setNewUser({ ...newUser, plan: e.target.value })}
                             >
-                              <option value="pro">PROFESSIONAL</option>
+                              <option value="free">FREE NODE</option>
+                              <option value="professional">PROFESSIONAL</option>
                               <option value="enterprise">ENTERPRISE (∞)</option>
                             </select>
                           </div>
@@ -797,8 +797,17 @@ export default function AdminDashboard() {
                           <Users size={20} className={user.is_active ? 'text-primary-cyan' : 'text-gray-500'} />
                         </div>
                         <div className="min-w-0 pr-2">
-                          <p className="m-0 text-[14px] font-black text-white tracking-tight truncate">{user.email}</p>
-                          <p className="m-0 text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">{user.plan || 'standard'} · NODE</p>
+                          <p className="m-0 text-[14px] font-black text-white tracking-tight truncate flex items-center gap-2">
+                              {user.email}
+                              {!user.is_active && <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-500 text-[8px] uppercase tracking-widest">Inactive</span>}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1.5">
+                              <p className="m-0 text-[10px] text-gray-500 font-bold uppercase tracking-widest">{user.plan || 'standard'} · NODE</p>
+                              <span className="w-1 h-1 rounded-full bg-white/10" />
+                              <span className="text-[9px] font-black text-primary-cyan uppercase tracking-widest flex items-center gap-1 bg-primary-cyan/10 px-1.5 rounded">
+                                  <Radio size={10} /> MESH: {user.channels_created_total || 0}
+                              </span>
+                          </div>
                         </div>
                       </div>
                       <div className="flex gap-2.5 shrink-0">
@@ -1281,56 +1290,7 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* ── SETTINGS TAB ── */}
-            {activeTab === 'settings' && (
-              <div className="max-w-[800px] space-y-8">
-                <div className="mb-4">
-                  <h2 className="m-0 text-xl font-black text-white uppercase tracking-tight">System Core Configuration</h2>
-                  <p className="m-0 mt-2 text-[10px] text-gray-500 font-bold uppercase tracking-widest">Global collective parameters and high-level platform behavior control.</p>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {[
-                    { key: 'registration_enabled', label: 'Identity Registry', desc: 'Allow remote node proposals.' },
-                    { key: 'auto_channel_approval', label: 'Handshake Sync', desc: 'Automatic tunnel establishment.' },
-                    { key: 'quantum_key_generation_enabled', label: 'Quantum Entropies', desc: 'Active hardware-backed generation.' },
-                  ].map(s => (
-                    <Card key={s.key} className="p-6 flex flex-col justify-between border-white/5 bg-white/[0.02] space-y-4">
-                      <div className="flex justify-between items-start">
-                        <span className="text-[9px] font-black text-primary-cyan uppercase tracking-[0.2em]">Safety Protocol</span>
-                        <button onClick={() => handleAction('/admin/settings', 'put', { [s.key]: !sysSettings[s.key] })} className="bg-transparent border-none cursor-pointer transition-transform active:scale-90">
-                          {sysSettings[s.key] ? <ToggleRight size={32} className="text-primary-cyan" /> : <ToggleLeft size={32} className="text-gray-700" />}
-                        </button>
-                      </div>
-                      <div>
-                        <p className="m-0 text-[14px] font-black text-white tracking-tight">{s.label}</p>
-                        <p className="m-0 text-[10px] text-gray-500 font-medium leading-relaxed mt-2">{s.desc}</p>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-
-                <Card className="p-8 border-primary-cyan/20 bg-primary-cyan/[0.02] space-y-8">
-                  <div className="flex items-center gap-3">
-                    <Zap size={20} className="text-primary-cyan" />
-                    <h3 className="m-0 text-[12px] font-black text-gray-400 uppercase tracking-[0.3em]">Runtime Hardening Limits</h3>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Default Node Quota</label>
-                      <Input type="number" value={sysSettings.default_channels_limit || 0} onChange={e => setSysSettings({ ...sysSettings, default_channels_limit: +e.target.value })} className="h-14 bg-black/40 border-white/10" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Entropy Hardening Floor</label>
-                      <Input type="number" value={sysSettings.default_encryption_limit || 0} onChange={e => setSysSettings({ ...sysSettings, default_encryption_limit: +e.target.value })} className="h-14 bg-black/40 border-white/10" />
-                    </div>
-                  </div>
-                  <Button onClick={() => handleAction('/admin/settings', 'put', sysSettings)} className="w-full h-14 font-black uppercase shadow-mesh-glow">
-                    Save Synchronization Parameters
-                  </Button>
-                </Card>
-              </div>
-            )}
           </div>
         </Card>
 

@@ -72,35 +72,64 @@ const STATS = [
 
 const PLANS = [
   {
+    name: 'Free Node',
+    price: '$0',
+    period: 'Forever',
+    desc: 'Community Intelligence',
+    features: [
+      'Up to 5 Lifetime Tunnels',
+      'Standard P2P Encryption',
+      'Mobile & Web Access',
+      'Community Intelligence',
+    ],
+    cta: 'Get Started',
+    highlighted: false,
+    icon: Shield,
+    color: 'text-gray-400',
+    border: 'border-white/10',
+    bg: 'bg-white/5',
+    buttonClass: 'bg-white/5 text-white border border-white/10 hover:bg-white/10'
+  },
+  {
     name: 'Professional',
-    price: '$500',
+    price: '$49',
     period: '/month',
     desc: 'For focused institutional security teams.',
     features: [
-      '50 Dedicated Encrypted Channels',
-      '500 AES-256 Quantum Keys / mo',
-      '20 MB Secure File Transfer',
-      'Audit Log Access',
-      'Email Support',
+      '50 Lifetime Tunnels',
+      'Advanced Entropy Rotation',
+      'High-Bandwidth Media Stream',
+      'Biometric Authentication',
+      'Priority Mesh Routing'
     ],
-    cta: 'Request Professional',
-    highlighted: false,
+    cta: 'Unlock Access',
+    highlighted: true,
+    icon: Zap,
+    color: 'text-primary-cyan',
+    border: 'border-primary-cyan/30',
+    bg: 'bg-primary-cyan/10',
+    buttonClass: 'bg-primary-cyan text-black hover:bg-white shadow-primary-cyan/20'
   },
   {
     name: 'Enterprise',
-    price: '$1,000',
-    period: '/month',
-    desc: 'Unlimited scale for multinational governmental infrastructure.',
+    price: 'Custom',
+    period: 'Contact Sales',
+    desc: 'Unlimited scale for multinational infrastructure.',
     features: [
-      'Infinite Dedicated Channels',
-      'Infinite Encryption Key Generation',
-      'Unlimited File Transfer',
-      'SAML / SSO Integrations',
-      '24/7 Rapid Cryptographic Support',
-      'Dedicated Node Engineer',
+      'Unlimited Tunnels & Groups',
+      'Sovereign Node Deployment',
+      'Dedicated Quantum Entropies',
+      'Zero-Knowledge Backups',
+      '24/7 Hardened Support',
+      'Full Audit Governance'
     ],
-    cta: 'Request Enterprise',
-    highlighted: true,
+    cta: 'Contact Sales',
+    highlighted: false,
+    icon: Globe,
+    color: 'text-violet-500',
+    border: 'border-violet-500/30',
+    bg: 'bg-violet-500/10',
+    buttonClass: 'bg-violet-500 text-white hover:bg-white hover:text-black shadow-violet-500/20'
   },
 ];
 
@@ -263,53 +292,50 @@ export default function Landing() {
             <p className="text-gray-400 text-lg">Simple scaling. Immediate provisioning post-approval.</p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {PLANS.map((plan, i) => (
               <div
                 key={i}
-                className={`rounded-2xl p-10 flex flex-col h-full relative ${
-                  plan.highlighted 
-                    ? 'bg-primary-cyan/5 border border-primary-cyan/30 shadow-[0_0_60px_rgba(6,182,212,0.07)]' 
-                    : 'bg-white/5 border border-white/10'
-                }`}
+                className={`flex flex-col p-0 border backdrop-blur-2xl rounded-[40px] overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl relative ${plan.border} ${plan.bg}`}
               >
                 {plan.highlighted && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <span className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold text-white bg-mesh-gradient">
-                      <Star size={11} fill="white" /> MOST SELECTED
-                    </span>
+                  <div className="absolute top-6 right-8 px-4 py-1.5 bg-primary-cyan text-black text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">
+                    Highly Recommended
                   </div>
                 )}
 
-                <div className="mb-8">
-                  <h3 className="text-2xl font-black text-white mb-2">{plan.name}</h3>
-                  <p className="text-gray-500 text-sm">{plan.desc}</p>
+                <div className="p-10 flex-1">
+                  <div className={`w-16 h-16 rounded-2xl ${plan.bg} border ${plan.border} flex items-center justify-center mb-8 ${plan.color}`}>
+                    <plan.icon size={32} />
+                  </div>
+                  
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-2">{plan.name}</h3>
+                  <div className="flex items-baseline gap-2 mb-8">
+                    <span className="text-5xl font-black text-white">{plan.price}</span>
+                    <span className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">{plan.period}</span>
+                  </div>
+
+                  <div className="space-y-4">
+                    {plan.features.map((feature, j) => (
+                      <div key={j} className="flex items-start gap-4">
+                        <div className={`mt-1 p-0.5 rounded-full ${plan.bg} ${plan.color}`}>
+                          <CheckCircle2 size={12} strokeWidth={4} />
+                        </div>
+                        <span className="text-sm font-semibold text-gray-300">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex items-baseline gap-2 mb-10 pb-10 border-b border-white/10">
-                  <span className="text-6xl font-black text-white">{plan.price}</span>
-                  <span className="text-gray-500 text-sm font-medium">{plan.period}</span>
+                <div className="p-10 pt-0">
+                  <Link
+                    to="/register"
+                    className={`block w-full text-center py-5 rounded-2xl ${plan.buttonClass} font-black uppercase tracking-widest text-[11px] transition-all flex items-center justify-center gap-3 active:scale-95 shadow-xl`}
+                  >
+                    {plan.cta}
+                    <ArrowRight size={16} />
+                  </Link>
                 </div>
-
-                <ul className="space-y-4 mb-10 flex-1">
-                  {plan.features.map((feat, j) => (
-                    <li key={j} className="flex items-start gap-3 text-sm text-gray-300">
-                      <CheckCircle2 size={16} className="text-cyan-400 shrink-0 mt-0.5" />
-                      {feat}
-                    </li>
-                  ))}
-                </ul>
-
-                <Link
-                  to="/register"
-                  className={`block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 ${
-                    plan.highlighted
-                      ? 'bg-mesh-gradient text-white hover:opacity-90'
-                      : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'
-                  }`}
-                >
-                  {plan.cta}
-                </Link>
               </div>
             ))}
           </div>

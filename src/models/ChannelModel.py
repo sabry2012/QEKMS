@@ -165,6 +165,32 @@ class ChannelModel:
         return result.deleted_count > 0
 
     @classmethod
+    async def increment_unread(cls, channel_id: str, email: str):
+        try:
+            oid = ObjectId(channel_id)
+        except (InvalidId, TypeError):
+            return False
+        db = get_db()
+        await db[cls.collection_name].update_one(
+            {"_id": oid},
+            {"$inc": {f"unread_counts.{email.replace('.', '_')}": 1}}
+        )
+        return True
+
+    @classmethod
+    async def clear_unread(cls, channel_id: str, email: str):
+        try:
+            oid = ObjectId(channel_id)
+        except (InvalidId, TypeError):
+            return False
+        db = get_db()
+        await db[cls.collection_name].update_one(
+            {"_id": oid},
+            {"$set": {f"unread_counts.{email.replace('.', '_')}": 0}}
+        )
+        return True
+
+    @classmethod
     async def sync_user_channels(cls, user_email: str, is_active: bool):
         db = get_db()
         channels = await db[cls.collection_name].find({

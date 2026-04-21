@@ -24,7 +24,7 @@ class CreateUserRequest(BaseModel):
     email: EmailStr
     password: str
     role: str = "account"
-    plan: str = "pro"
+    plan: str = "professional"
 
 
 class UpdateUserRequest(BaseModel):
@@ -75,6 +75,7 @@ async def list_all_users():
         limits = PLAN_LIMITS.get(plan, PLAN_LIMITS[DEFAULT_PLAN])
         acc["channels_limit"] = limits["channels_limit"]
         acc["encryption_limit"] = limits["encryption_limit"]
+        acc["channels_created_total"] = acc.get("channels_created_total", 0)
         users.append(acc)
     for adm in admins:
         adm.pop("password", None)
@@ -82,6 +83,7 @@ async def list_all_users():
         adm["plan"] = "enterprise"
         adm["channels_limit"] = -1
         adm["encryption_limit"] = -1
+        adm["channels_created_total"] = "∞"
         users.append(adm)
 
     return users
@@ -395,8 +397,8 @@ async def admin_approve_client(request_id: str, request: Request, admin=Depends(
     # Generate secure credentials
     raw_password = secrets.token_urlsafe(12)
     hashed = get_password_hash(raw_password)
-    plan = req.get("plan", "pro")
-    limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["pro"])
+    plan = req.get("plan", "professional")
+    limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["professional"])
     now = datetime.utcnow()
     duration = PLAN_DURATION_DAYS.get(plan, 365)
     admin_email = admin.get("sub", "System")

@@ -4,7 +4,7 @@ from src.helpers.database import get_db
 # Plans available for internal user creation by admins
 PLAN_LIMITS = {
     "free": {"channels_limit": 5, "encryption_limit": 50},
-    "pro": {"channels_limit": 50, "encryption_limit": 500},
+    "professional": {"channels_limit": 50, "encryption_limit": 500},
     "enterprise": {"channels_limit": -1, "encryption_limit": -1},  # -1 = unlimited
 }
 

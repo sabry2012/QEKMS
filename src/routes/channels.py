@@ -198,19 +198,26 @@ async def list_channels(user: dict = Depends(get_current_user_from_cookie)):
             # Check online status
             is_online = chat_manager.is_user_online(other_email)
             
-            # Fetch last_seen from DB if not online
             last_seen = None
-            if not is_online:
-                other_user = await AccountModel.get_by_email(other_email) or await AdminModel.get_by_email(other_email)
-                if other_user:
-                    last_seen = other_user.get("last_seen")
-                    if last_seen and hasattr(last_seen, "isoformat"):
-                        last_seen = last_seen.isoformat()
+            status = "online" if is_online else "offline"
+            
+            other_user = await AccountModel.get_by_email(other_email) or await AdminModel.get_by_email(other_email)
+            
+            if not other_user:
+                status = "deleted"
+            elif not other_user.get("is_active", True):
+                status = "inactive"
+            elif not is_online:
+                last_seen = other_user.get("last_seen")
+                if last_seen and hasattr(last_seen, "isoformat"):
+                    last_seen = last_seen.isoformat()
             
             ch["other_presence"] = {
-                "status": "online" if is_online else "offline",
+                "status": status,
                 "last_seen": last_seen
             }
+            
+        ch["unread_count"] = ch.get("unread_counts", {}).get(user_email, 0)
         enriched.append(ch)
 
     return enriched
@@ -238,11 +245,12 @@ async def create_channel(
         channels_limit = limits.get("channels_limit", 5)
 
         if channels_limit != -1:
-            current_count = await ChannelModel.count_user_channels(sender_email)
-            if current_count >= channels_limit:
+            # ANTI-GAMING: Check total channels created across account lifetime
+            total_created = sender.get("channels_created_total", 0) if sender else 0
+            if total_created >= channels_limit:
                 raise HTTPException(
                     status_code=403,
-                    detail=f"Subscription limit reached ({current_count}/{channels_limit}). Please upgrade for more mappings."
+                    detail=f"Subscription lifetime limit reached ({total_created}/{channels_limit}). Please upgrade for more mappings."
                 )
 
     # 2. Verify receiver exists (Account or Admin)
@@ -282,6 +290,13 @@ async def create_channel(
             "key_version": 1,
         },
     )
+    # 7. Record Creation in Account (for Lifetime Tracking)
+    if sender_role != "admin":
+        sender = await AccountModel.get_by_email(sender_email)
+        if sender:
+            new_total = sender.get("channels_created_total", 0) + 1
+            await AccountModel.update(sender["id"], {"channels_created_total": new_total})
+
     return {"message": "Secure channel established.", "channel": new_channel}
 
 @channel_router.post("/handshake")
@@ -434,6 +449,13 @@ async def create_group_channel(
         },
     )
     logger.info(f"Group channel created: {new_channel['id']} by {sender_email}")
+    # 7. Record Creation in Account (for Lifetime Tracking)
+    if sender_role != "admin":
+        sender = await AccountModel.get_by_email(sender_email)
+        if sender:
+            new_total = sender.get("channels_created_total", 0) + 1
+            await AccountModel.update(sender["id"], {"channels_created_total": new_total})
+
     return {"message": "Secure group channel established.", "channel": new_channel}
 
 
@@ -585,6 +607,14 @@ async def send_secure_message(
 
     user_email = user["sub"]
     
+    receiver_email = channel.get("receiver") if channel.get("sender") == user_email else channel.get("sender")
+    if receiver_email:
+        receiver_user = await AccountModel.get_by_email(receiver_email) or await AdminModel.get_by_email(receiver_email)
+        if not receiver_user:
+            raise HTTPException(status_code=403, detail="Target user has been deleted from the registry.")
+        if not receiver_user.get("is_active", True):
+            raise HTTPException(status_code=403, detail="Target user account explicitly deactivated.")
+
     # 1. Freshness Check (±30 minutes — allows for significant clock skew/TZ issues)
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     diff = abs(now_ms - data.timestamp)
@@ -648,7 +678,22 @@ async def send_secure_message(
         },
     )
     
+    if receiver_email:
+        await ChannelModel.increment_unread(channel_id, receiver_email)
+        # Broadcast the unread increment explicitly so clients can update their badges without refreshing
+        await chat_manager.broadcast(channel_id, {"type": "unread_increment", "channel_id": channel_id, "user": receiver_email})
+
     return saved
+
+@channel_router.post("/{channel_id}/read")
+async def mark_channel_read(channel_id: str, user: dict = Depends(get_current_user_from_cookie)):
+    user_email = user["sub"]
+    channel = await ChannelModel.get_by_id_internal(channel_id)
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+        
+    await ChannelModel.clear_unread(channel_id, user_email)
+    return {"message": "Unread counter cleared"}
 
 
 @channel_router.post("/{channel_id}/upload")

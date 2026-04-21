@@ -9,6 +9,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import QuantumDashboard from './pages/QuantumDashboard';
 import AuditLogsDashboard from './pages/AuditLogsDashboard';
 import ForgotPassword from './pages/ForgotPassword';
+import UpgradePage from './pages/UpgradePage';
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { user, loading } = useAuth();
@@ -42,6 +43,15 @@ const App = () => {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/upgrade"
+          element={
+            <ProtectedRoute>
+              <UpgradePage />
             </ProtectedRoute>
           }
         />

@@ -189,15 +189,16 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [securityError, setSecurityError] = useState<string | null>(null);
-  const [presence, setPresence] = useState<Record<string, { status: 'online' | 'offline', last_seen?: string }>>({});
+  const [presence, setPresence] = useState<Record<string, { status: 'online' | 'offline' | 'deleted' | 'inactive', last_seen?: string }>>({});
   const [receiverEmail, setReceiverEmail] = useState('');
   const [createError, setCreateError] = useState('');
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
 
   // Limits
-  const PLAN_LIMITS: any = { free: 5, pro: 50, enterprise: -1 };
+  const PLAN_LIMITS: any = { free: 5, professional: 50, enterprise: Infinity };
   const currentLimit = PLAN_LIMITS[user?.plan || 'free'] || 5;
-  const isAtLimit = currentLimit !== -1 && channels.length >= currentLimit;
+  const totalCreated = user?.channels_created_total || channels.length;
+  const isAtLimit = currentLimit !== Infinity && totalCreated >= currentLimit;
 
   // Media state
   const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
@@ -349,6 +350,10 @@ export default function Dashboard() {
           if (activeChannel && payload.channel_id === activeChannel.id) {
             setMessages([]);
           }
+        } else if (payload.type === 'unread_increment') {
+            if (payload.user === user?.email && activeChannel?.id !== payload.channel_id) {
+                setChannels(prev => prev.map(c => c.id === payload.channel_id ? { ...c, unread_count: ((c as any).unread_count || 0) + 1 } : c));
+            }
         }
       } catch (err) {
         console.error('[Dashboard] Real-time Error:', err);
@@ -446,6 +451,11 @@ export default function Dashboard() {
     setActiveChannel(channel);
     setMobileView('chat');
     loadInitialMessages(channel);
+    
+    if ((channel as any).unread_count > 0) {
+      api.post(`/channels/${channel.id}/read`).catch(console.error);
+      setChannels(prev => prev.map(c => c.id === channel.id ? { ...c, unread_count: 0 } : c));
+    }
   };
 
   const handleClearChat = async (channelId: string, e: React.MouseEvent) => {
@@ -559,13 +569,13 @@ export default function Dashboard() {
                 <div className="flex justify-between items-center mb-2">
                     <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Mapping Capacity</span>
                     <span className={`text-[10px] font-black uppercase ${isAtLimit ? 'text-amber-500' : 'text-primary-cyan'}`}>
-                        {channels.length} / {currentLimit === -1 ? '∞' : currentLimit}
+                        {totalCreated} / {currentLimit === Infinity ? '∞' : currentLimit}
                     </span>
                 </div>
                 <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
                     <motion.div 
                         initial={{ width: 0 }}
-                        animate={{ width: `${currentLimit === -1 ? 100 : (channels.length / currentLimit) * 100}%` }}
+                        animate={{ width: `${currentLimit === Infinity ? 100 : (totalCreated / currentLimit) * 100}%` }}
                         className={`h-full ${isAtLimit ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]' : 'bg-primary-cyan shadow-[0_0_8px_rgba(6,182,212,0.4)]'}`}
                     />
                 </div>
@@ -593,6 +603,8 @@ export default function Dashboard() {
                     filteredChannels.map(channel => {
                         const isActive = activeChannel?.id === channel.id;
                         const other = channel.sender === user?.email ? channel.receiver : channel.sender;
+                        const peerStatus = presence[other]?.status;
+                        
                         return (
                             <div
                                 key={channel.id}
@@ -613,7 +625,11 @@ export default function Dashboard() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-center mb-0.5">
-                                            <span className="text-[13px] font-black truncate uppercase tracking-tight">{other.split('@')[0]}</span>
+                                            <span className="text-[13px] font-black truncate uppercase tracking-tight flex items-center gap-2">
+                                                {other.split('@')[0]}
+                                                {peerStatus === 'deleted' && <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-500 text-[8px] uppercase tracking-widest line-through">DELETED</span>}
+                                                {peerStatus === 'inactive' && <span className="px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 text-[8px] uppercase tracking-widest">INACTIVE</span>}
+                                            </span>
                                             <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-widest ${
                                                 channel.is_pending ? 'text-amber-500 border-amber-500/20 bg-amber-500/5' : 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5'
                                             }`}>
@@ -622,6 +638,13 @@ export default function Dashboard() {
                                         </div>
                                         <p className="m-0 text-[10px] text-gray-500 truncate font-mono">{other}</p>
                                     </div>
+                                    {(channel as any).unread_count > 0 && !isActive && (
+                                        <div className="shrink-0">
+                                            <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-black shadow-[0_0_10px_rgba(239,68,68,0.8)]">
+                                                {(channel as any).unread_count}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                                 
                                 <button
@@ -683,8 +706,14 @@ export default function Dashboard() {
                                 <UserCircle size={24} />
                             </div>
                             <div>
-                                <h3 className="text-[17px] font-black text-white m-0 tracking-tight">
+                                <h3 className="text-[17px] font-black text-white m-0 tracking-tight flex items-center gap-2">
                                     {(activeChannel.sender === user?.email ? activeChannel.receiver : activeChannel.sender).split('@')[0]}
+                                    {presence[(activeChannel.sender === user?.email ? activeChannel.receiver : activeChannel.sender)]?.status === 'deleted' && (
+                                        <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-500 text-[9px] uppercase tracking-widest">Deleted</span>
+                                    )}
+                                    {presence[(activeChannel.sender === user?.email ? activeChannel.receiver : activeChannel.sender)]?.status === 'inactive' && (
+                                        <span className="px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 text-[9px] uppercase tracking-widest">Inactive</span>
+                                    )}
                                 </h3>
                                 <div className="flex items-center gap-2 mt-0.5">
                                     {presence[(activeChannel.sender === user?.email ? activeChannel.receiver : activeChannel.sender)]?.status === 'online' ? (
@@ -961,53 +990,66 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Mapping Modal ── */}
+
+      {/* ── Modals & Overlays ── */}
       {showCreateChannel && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[1000] flex items-center justify-center p-6 animate-in fade-in duration-300" onClick={() => setShowCreateChannel(false)}>
-              <Card onClick={e => e.stopPropagation()} className="w-full max-w-md p-10 space-y-8 border-primary-cyan/30 bg-mesh-dark shadow-[0_0_100px_rgba(6,182,212,0.15)] animate-in zoom-in-95 duration-300 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-mesh-gradient" />
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
+              <Card className="w-full max-w-lg p-8 border-white/10 bg-mesh-dark shadow-2xl relative animate-in zoom-in-95 duration-200">
+                <button onClick={() => setShowCreateChannel(false)} className="absolute top-6 right-6 p-2 text-gray-600 hover:text-white transition-colors bg-transparent border-none cursor-pointer">
+                    <X size={20} />
+                </button>
                 
-                <div className="text-center space-y-4">
-                    <div className="w-20 h-20 bg-primary-cyan/10 mx-auto rounded-3xl flex items-center justify-center border border-primary-cyan/20">
-                        <Radio size={36} className="text-primary-cyan" />
+                <div className="mb-8">
+                    <div className="w-16 h-16 rounded-[24px] bg-primary-cyan/10 border border-primary-cyan/20 flex items-center justify-center mb-6 text-primary-cyan">
+                        <Plus size={32} />
                     </div>
-                    <h3 className="text-3xl font-black text-white m-0 tracking-tight">Initiate Mapping</h3>
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em] m-0">Secure Node Discovery Sequence</p>
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tight m-0">Establish Tunnel</h2>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-2 leading-relaxed">Input node identity for quantum-safe peer correlation.</p>
                 </div>
 
                 {!isAtLimit ? (
-                    <form onSubmit={handleCreateChannel} className="space-y-6 pt-4">
+                    <form onSubmit={handleCreateChannel} className="space-y-6">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Remote Node Identity</label>
+                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-2">Recipient Email</label>
                             <Input 
+                                placeholder="NODE::IDENTITY::EMAIL"
                                 type="email"
-                                required
-                                placeholder="OPERATOR@MESH.PROTOCOL"
                                 value={receiverEmail}
                                 onChange={e => setReceiverEmail(e.target.value)}
-                                className="h-14 font-mono text-sm bg-black/40"
+                                className="h-14 bg-black/40 border-white/10 text-sm font-mono focus:border-primary-cyan/50 focus:ring-4 focus:ring-primary-cyan/5"
+                                required
                             />
                         </div>
+                        
                         {createError && (
-                            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-black text-center uppercase tracking-widest">
+                            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-black uppercase tracking-widest animate-in slide-in-from-top-2">
+                                <AlertTriangle size={14} className="inline mr-2 -mt-0.5" />
                                 {createError}
                             </div>
                         )}
-                        <div className="flex gap-4 pt-2">
-                            <Button type="submit" className="flex-1 h-14 text-[13px] font-black shadow-mesh-glow uppercase tracking-widest">Establish Route</Button>
-                            <Button variant="secondary" type="button" onClick={() => setShowCreateChannel(false)} className="flex-1 h-14 text-[13px] font-bold">Abort</Button>
+
+                        <div className="pt-2 flex gap-3">
+                            <button 
+                                type="submit" 
+                                className="flex-1 h-14 rounded-2xl bg-mesh-gradient border border-primary-cyan/30 text-white font-black uppercase tracking-widest text-xs hover:scale-[1.02] active:scale-[0.98] transition-all shadow-mesh-glow"
+                            >
+                                Initiate Mapping
+                            </button>
                         </div>
                     </form>
                 ) : (
                     <div className="pt-4 space-y-6 text-center">
                         <div className="p-6 rounded-3xl bg-amber-500/5 border border-amber-500/10 space-y-3">
                             <AlertTriangle size={32} className="text-amber-500 mx-auto" />
-                            <h4 className="text-lg font-black text-white tracking-tight">Quota Reached</h4>
-                            <p className="text-xs text-gray-400 leading-relaxed">
-                                Your <span className="text-amber-500 font-bold uppercase">{user?.plan || 'Free'}</span> plan is currently restricted to {currentLimit} mesh nodes. Access to further mappings requires a higher clearace level.
+                            <h4 className="text-lg font-black text-white tracking-tight m-0">Quota Reached</h4>
+                            <p className="text-xs text-gray-400 leading-relaxed m-0 italic">
+                                Your <span className="text-amber-500 font-bold uppercase">{user?.plan || 'Free'}</span> plan is currently restricted to {currentLimit} mesh nodes. Access to further mappings requires a higher clearance level.
                             </p>
                         </div>
-                        <Button className="w-full h-14 bg-amber-500 text-black hover:bg-white transition-all font-black uppercase tracking-widest">
+                        <Button 
+                            onClick={() => window.location.href = '/upgrade'}
+                            className="w-full h-14 bg-amber-500 text-black hover:bg-white transition-all font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-amber-500/20"
+                        >
                              UPGRADE CLEARANCE
                         </Button>
                         <button onClick={() => setShowCreateChannel(false)} className="text-[10px] font-bold text-gray-600 hover:text-white transition-colors bg-transparent border-none cursor-pointer">
@@ -1018,6 +1060,7 @@ export default function Dashboard() {
               </Card>
           </div>
       )}
+
       {/* ── Image Lightbox ── */}
       {previewImage && (
           <div className="fixed inset-0 bg-black/95 z-[2000] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setPreviewImage(null)}>

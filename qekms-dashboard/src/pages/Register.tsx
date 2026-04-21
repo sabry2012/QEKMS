@@ -11,19 +11,22 @@ import { Card } from '../components/ui/Card';
 
 const PLANS = [
   {
+    id: 'free',
+    name: 'Free Node',
+    price: '$0',
+    period: '/Forever',
+  },
+  {
     id: 'pro',
     name: 'Professional',
-    price: '$500',
+    price: '$49',
     period: '/mo',
-    features: ['50 Encrypted Channels', '500 Quantum Keys', '20 MB File Transfers'],
   },
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: '$1,000',
-    period: '/mo',
-    features: ['Infinite Channels', 'Infinite Key Generation', 'SSO / SAML', '24/7 Support'],
-    badge: 'Most Popular',
+    price: 'Custom',
+    period: '/Contact',
   },
 ];
 
@@ -136,7 +139,7 @@ export default function Register() {
                 <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Select Tier</label>
                 <Link to="/pricing" className="text-[10px] font-bold text-primary-cyan underline">View Details</Link>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {PLANS.map(plan => (
                   <button
                     key={plan.id}

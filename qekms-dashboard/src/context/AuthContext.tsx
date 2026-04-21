@@ -6,6 +6,7 @@ interface User {
   role: string;
   id: string;
   plan: string;
+  channels_created_total?: number;
 }
 
 interface AuthContextType {
@@ -32,6 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: res.data.user.role,
           id: res.data.user.id,
           plan: res.data.user.plan || 'free',
+          channels_created_total: res.data.user.channels_created_total,
         });
         setSessionExp(res.data.user.exp);
       } else {
