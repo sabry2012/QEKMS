@@ -34,11 +34,9 @@ async def connect_to_mongo():
             await client.admin.command("ping")
             db = client[db_name]
             logger.info("Connected to MongoDB successfully")
-            print("Connected to MongoDB successfully")
             return
         except Exception as e:
-            logger.warning(f"MongoDB not ready (attempt {attempt + 1}/15): {e}")
-            print(f"MongoDB not ready (attempt {attempt + 1}/15), retrying in 3s...")
+            logger.warning(f"MongoDB not ready (attempt {attempt + 1}/15): {e}. Retrying in 3s...")
             await asyncio.sleep(3)
 
     raise RuntimeError("Could not connect to MongoDB after 15 attempts")

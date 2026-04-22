@@ -239,6 +239,7 @@ async def create_channel(
         raise HTTPException(status_code=400, detail="Cannot create a channel with yourself.")
 
     # 1. Plan Limit Enforcement (Skip for Admin)
+    sender = None
     if sender_role != "admin":
         sender = await AccountModel.get_by_email(sender_email)
         plan = sender.get("plan", DEFAULT_PLAN) if sender else DEFAULT_PLAN

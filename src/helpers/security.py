@@ -100,3 +100,5 @@ def require_admin(request: Request) -> dict:
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Not enough privileges")
     return user
+
+

@@ -7,6 +7,7 @@ from src.models.ModelsSchemas.ClientRequestSchema import ClientRequestCreate
 from src.models.SettingsModel import PLAN_LIMITS # Added for potential future parity
 CLIENT_PLANS = ["starter", "professional", "enterprise"] # Explicitly in sync with frontend
 from email_validator import validate_email, EmailNotValidError
+import phonenumbers
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,25 @@ async def submit_access_request(data: ClientRequestCreate):
         raise HTTPException(
             status_code=400,
             detail=f"DEBUG_VALIDATION: Plan '{data.plan}' is not in the system registry. Registry contains: {CLIENT_PLANS}",
+        )
+
+    # Validate Phone Number
+    try:
+        phone_str = str(data.phone).strip()
+        # Ensure it starts with + for international parsing
+        if not phone_str.startswith('+'):
+            phone_str = '+' + phone_str
+            
+        parsed_phone = phonenumbers.parse(phone_str)
+        if not phonenumbers.is_valid_number(parsed_phone):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"The phone number '{data.phone}' is not valid for the selected country region. Please check for extra or missing digits."
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid phone number format. Please ensure it includes the country code."
         )
 
     # Validate Email via Syntax and MX checks
@@ -69,6 +89,15 @@ async def submit_access_request(data: ClientRequestCreate):
             status_code=409,
             detail="An account with this email already exists.",
         )
+
+    # Check for unique phone number in active accounts
+    already_phone = await AM.get_by_phone(data.phone.strip())
+    if already_phone:
+        raise HTTPException(
+            status_code=409,
+            detail="This phone number is already registered to an active account.",
+        )
+
 
     doc = {
         "full_name": data.full_name.strip(),

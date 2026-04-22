@@ -10,11 +10,18 @@ import QuantumDashboard from './pages/QuantumDashboard';
 import AuditLogsDashboard from './pages/AuditLogsDashboard';
 import ForgotPassword from './pages/ForgotPassword';
 import UpgradePage from './pages/UpgradePage';
+import CompleteProfile from './pages/CompleteProfile';
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400 bg-[#05070a]">Loading Intelligence...</div>;
   if (!user) return <Navigate to="/login" />;
+  
+  // Profile Completion Guard
+  if (!user.phone_number && user.role !== 'admin' && window.location.pathname !== '/complete-profile') {
+    return <Navigate to="/complete-profile" />;
+  }
+  
   return <>{children}</>;
 };
 
@@ -36,6 +43,11 @@ const App = () => {
         <Route path="/register" element={<Register />} />
         <Route path="/status" element={<ClientStatus />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/complete-profile" element={
+          <ProtectedRoute>
+            <CompleteProfile />
+          </ProtectedRoute>
+        } />
 
         {/* Authenticated (Wrapped in AppLayout via Route components) */}
         <Route

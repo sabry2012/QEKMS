@@ -30,8 +30,10 @@ class Settings(BaseSettings):
     APP_URL: str = "http://localhost"
 
     # ── Security ──────────────────────────────────────────────────────
+    GOOGLE_CLIENT_ID: Optional[str] = None
     # Set to True in production (HTTPS) to enable secure cookie flags.
     SECURE_COOKIES: bool = False
+
 
     model_config = {
         "env_file": ".env",

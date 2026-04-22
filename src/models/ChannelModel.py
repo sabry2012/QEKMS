@@ -7,6 +7,18 @@ from datetime import datetime
 
 class ChannelModel:
     collection_name = "channels"
+    
+    @staticmethod
+    def _normalize(doc: dict, strip_sensitive: bool = True):
+        if not doc:
+            return None
+        doc["id"] = str(doc["_id"])
+        del doc["_id"]
+        if strip_sensitive:
+            doc.pop("keys", None)
+            doc.pop("shared_key", None)
+            doc.pop("private_key", None)
+        return doc
 
     @classmethod
     async def create(cls, channel_data: dict):
@@ -44,45 +56,24 @@ class ChannelModel:
             return None
         db = get_db()
         doc = await db[cls.collection_name].find_one({"_id": oid})
-        if doc:
-            doc["id"] = str(doc["_id"])
-            del doc["_id"]
-            # Security: strip sensitive fields
-            doc.pop("keys", None)
-            doc.pop("shared_key", None)
-            doc.pop("private_key", None)
-        return doc
+        return cls._normalize(doc)
 
     @classmethod
     async def get_by_participants(cls, sender_email: str, receiver_email: str):
         db = get_db()
-        channel = await db[cls.collection_name].find_one({
+        doc = await db[cls.collection_name].find_one({
             "$or": [
                 {"sender": sender_email, "receiver": receiver_email},
                 {"sender": receiver_email, "receiver": sender_email},
             ]
         })
-        if channel:
-            channel["id"] = str(channel["_id"])
-            del channel["_id"]
-            # Security: strip sensitive fields
-            channel.pop("keys", None)
-            channel.pop("shared_key", None)
-            channel.pop("private_key", None)
-        return channel
+        return cls._normalize(doc)
 
     @classmethod
     async def get_all(cls):
         db = get_db()
         channels = await db[cls.collection_name].find().to_list(1000)
-        for ch in channels:
-            ch["id"] = str(ch["_id"])
-            del ch["_id"]
-            # Security: strip sensitive fields
-            ch.pop("keys", None)
-            ch.pop("shared_key", None)
-            ch.pop("private_key", None)
-        return channels
+        return [cls._normalize(ch) for ch in channels]
 
     @classmethod
     async def get_by_id_internal(cls, channel_id: str):
@@ -93,10 +84,7 @@ class ChannelModel:
             return None
         db = get_db()
         doc = await db[cls.collection_name].find_one({"_id": oid})
-        if doc:
-            doc["id"] = str(doc["_id"])
-            del doc["_id"]
-        return doc
+        return cls._normalize(doc, strip_sensitive=False)
 
     @classmethod
     async def rotate_key(cls, channel_id: str, new_key_data: dict, new_version: int):

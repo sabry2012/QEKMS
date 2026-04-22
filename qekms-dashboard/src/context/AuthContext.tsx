@@ -6,6 +6,8 @@ interface User {
   role: string;
   id: string;
   plan: string;
+  full_name: string;
+  phone_number?: string;
   channels_created_total?: number;
 }
 
@@ -28,14 +30,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const res = await api.get('/auth/me');
       if (res.data?.user) {
+        const u = res.data.user;
         setUser({
-          email: res.data.user.sub,
-          role: res.data.user.role,
-          id: res.data.user.id,
-          plan: res.data.user.plan || 'free',
-          channels_created_total: res.data.user.channels_created_total,
+          email: u.email || u.sub,
+          role: u.role,
+          id: u.id,
+          plan: u.plan || 'free',
+          full_name: u.full_name || 'User',
+          phone_number: u.phone_number,
+          channels_created_total: u.channels_created_total,
         });
-        setSessionExp(res.data.user.exp);
+        setSessionExp(res.data.exp);
       } else {
         setUser(null);
         setSessionExp(null);

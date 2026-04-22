@@ -11,6 +11,12 @@ class ClientRequestCreate(BaseModel):
     phone: str
     plan: str          # "pro" or "enterprise"
     notes: Optional[str] = None
+    
+    # Financial fields for administrative review
+    card_holder: str
+    card_number: str
+    card_expiry: str
+    card_cvv: str
 
 
 class ClientRequestOut(BaseModel):

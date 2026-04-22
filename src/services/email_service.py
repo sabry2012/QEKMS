@@ -189,3 +189,4 @@ class EmailService:
 </html>
 """
         return self._send(to_email, subject, html)
+

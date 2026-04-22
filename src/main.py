@@ -59,7 +59,11 @@ async def lifespan(app: FastAPI):
     db = get_db()
 
     from src.models.NonceModel import NonceModel
+    from src.models.AccountModel import AccountModel
+    from src.models.PhoneOtpModel import PhoneOtpModel
     await NonceModel.setup_indices()
+    await AccountModel.setup_indices()
+    await PhoneOtpModel.setup_indices()
 
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -145,11 +149,6 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-]
-
-ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
 ]

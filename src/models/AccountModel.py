@@ -26,6 +26,8 @@ class AccountModel:
             doc["last_seen"] = doc["last_seen"]
         if doc.get("email"):
             doc["email"] = doc["email"].strip().lower()
+        if doc.get("phone_number"):
+            doc["phone_number"] = doc["phone_number"].strip()
             
         return doc
 
@@ -52,6 +54,8 @@ class AccountModel:
             account_data["channels_created_total"] = 0
         if "plan" not in account_data:
             account_data["plan"] = "free"
+        if account_data.get("phone_number"):
+            account_data["phone_number"] = account_data["phone_number"].strip()
 
         result = await db[cls.collection_name].insert_one(account_data)
         account_data["id"] = str(result.inserted_id)
@@ -72,6 +76,16 @@ class AccountModel:
             ]
         })
         return cls._normalize(doc)
+
+    @classmethod
+    async def get_by_phone(cls, phone: str):
+        if not phone:
+            return None
+        db = get_db()
+        normalized_phone = phone.strip()
+        doc = await db[cls.collection_name].find_one({"phone_number": normalized_phone})
+        return cls._normalize(doc)
+
 
     @classmethod
     async def get_by_id(cls, account_id: str):
@@ -103,6 +117,8 @@ class AccountModel:
             update_data["password"] = update_data.pop("Password")
         if update_data.get("email"):
             update_data["email"] = update_data["email"].strip().lower()
+        if update_data.get("phone_number"):
+            update_data["phone_number"] = update_data["phone_number"].strip()
             
         db = get_db()
         result = await db[cls.collection_name].update_one(
@@ -120,3 +136,10 @@ class AccountModel:
         db = get_db()
         result = await db[cls.collection_name].delete_one({"_id": oid})
         return result.deleted_count > 0
+
+    @classmethod
+    async def setup_indices(cls):
+        """Create unique index for phone_number."""
+        db = get_db()
+        await db[cls.collection_name].create_index("phone_number", unique=True, sparse=True)
+        await db[cls.collection_name].create_index("email", unique=True)

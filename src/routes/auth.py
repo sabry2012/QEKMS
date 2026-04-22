@@ -16,6 +16,9 @@ from src.models.AccountModel import AccountModel
 from src.models.AdminModel import AdminModel
 from src.models.SettingsModel import DEFAULT_PLAN, PLAN_DURATION_DAYS, PLAN_LIMITS, SettingsModel
 from src.config import settings
+from src.helpers.google_auth import verify_google_token
+from src.models.PhoneOtpModel import PhoneOtpModel
+from src.services.SmsService import SmsService
 from src.services.AuditService import AuditService
 
 logger = logging.getLogger(__name__)
@@ -41,6 +44,12 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
     full_name: str = "New User"
+    phone_number: str
+    otp_code: str
+    card_holder: str
+    card_number: str
+    card_expiry: str
+    card_cvv: str
     plan: str = DEFAULT_PLAN
 
     class Config:
@@ -49,9 +58,13 @@ class RegisterRequest(BaseModel):
                 "email": "user@example.com",
                 "password": "strongpassword123",
                 "full_name": "John Doe",
+                "phone_number": "+1234567890",
                 "plan": "free"
             }
         }
+
+class GoogleLoginRequest(BaseModel):
+    token: str
 
 
 # ── LOGIN ──────────────────────────────────────────────────────────────
@@ -129,7 +142,9 @@ async def login(request: Request, response: Response, login_data: LoginRequest):
         token_payload = {
             "sub": user_email,
             "role": role,
-            "id": user_id
+            "id": user_id,
+            "plan": user.get("plan", "free"),
+            "full_name": user.get("full_name", "")
         }
         
         access_token = create_access_token(token_payload)
@@ -183,6 +198,175 @@ async def login(request: Request, response: Response, login_data: LoginRequest):
         )
 
 
+# ── GOOGLE LOGIN ──────────────────────────────────────────────────────
+@auth_router.post("/google")
+async def google_login(request: Request, response: Response, google_data: GoogleLoginRequest):
+    """
+    Authenticate a user using Google ID token.
+    """
+    try:
+        # 1. Verify token
+        id_info = await verify_google_token(google_data.token)
+        email = id_info.get("email", "").lower()
+        if not email:
+            raise HTTPException(status_code=400, detail="Email not provided by Google")
+        
+        full_name = id_info.get("name", "Google User")
+        
+        # 2. Check if user exists
+        user = await AccountModel.get_by_email(email)
+        
+        if not user:
+            # Create new user if they don't exist
+            # Note: For Google login, we might need a placeholder password or skip it
+            now = datetime.utcnow()
+            plan = DEFAULT_PLAN
+            duration = PLAN_DURATION_DAYS.get(plan, 30)
+            limits = PLAN_LIMITS[plan]
+            
+            user_data = {
+                "email": email,
+                "password": get_password_hash("GOOGLE_AUTH_PLACEHOLDER_" + email), # Secure placeholder
+                "full_name": full_name,
+                "role": "account",
+                "admin_account": "Google OAuth",
+                "is_active": True,
+                "plan": plan,
+                "channels_limit": limits["channels_limit"],
+                "encryption_limit": limits["encryption_limit"],
+                "subscription_status": "active",
+                "subscription_start": now,
+                "subscription_end": now + timedelta(days=duration),
+                "payment_status": "trial",
+                "last_modification": now,
+            }
+            user = await AccountModel.create(user_data)
+            logger.info(f"New user created via Google login: {email}")
+        
+        user_id = user.get("id") or str(user.get("_id", ""))
+        user_email = user.get("email")
+        role = user.get("role", "account")
+        phone = user.get("phone_number")
+
+        # 3. Check for profile completion
+        is_new = not bool(phone)
+
+        # 4. Issue Tokens
+        token_payload = {
+            "sub": user_email,
+            "role": role,
+            "id": user_id,
+            "plan": user.get("plan", "free"),
+            "full_name": user.get("full_name", "")
+        }
+        
+        access_token = create_access_token(token_payload)
+        refresh_token = create_refresh_token(token_payload)
+
+        is_secure = settings.SECURE_COOKIES
+        response.set_cookie(key="access_token", value=access_token, httponly=True, secure=is_secure, samesite="lax", max_age=1800, path="/")
+        response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=is_secure, samesite="strict", max_age=604800, path="/auth/refresh")
+
+        return {
+            "status": "success", 
+            "message": "Google login successful", 
+            "role": role,
+            "profile_incomplete": is_new
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"GOOGLE LOGIN ERROR: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Google authentication failed."
+        )
+
+
+class OtpRequest(BaseModel):
+    phone_number: str
+
+
+@auth_router.post("/verify-otp")
+async def verify_otp(data: OtpVerifyRequest):
+    phone = data.phone_number.replace(" ", "")
+    if not phone.startsWith("+"):
+        phone = "+" + phone
+    
+    otp_record = await PhoneOtpModel.verify(phone, data.otp_code)
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP code.")
+    
+    return {"status": "success", "message": "OTP verified."}
+
+class CompleteProfileRequest(BaseModel):
+    phone_number: str
+    otp_code: str
+    card_holder: str
+    card_number: str
+    card_expiry: str
+    card_cvv: str
+
+
+class OtpVerifyRequest(BaseModel):
+    phone_number: str
+    otp_code: str
+
+@auth_router.post("/request-otp")
+async def request_otp(data: OtpRequest):
+    phone = data.phone_number.strip()
+    # Check if phone is already in use by another account
+    existing = await AccountModel.get_by_phone(phone)
+    if existing:
+        raise HTTPException(status_code=400, detail="This phone number is already registered.")
+    
+    code = await PhoneOtpModel.create_otp(phone)
+    await SmsService.send_otp(phone, code)
+    return {"status": "success", "message": "OTP sent successfully"}
+
+
+@auth_router.patch("/complete-profile")
+async def complete_profile(
+    reg_data: CompleteProfileRequest, 
+    user_payload: dict = Depends(get_current_user_from_cookie)
+):
+    """Allow new Google users to set and verify their unique phone number."""
+    user_id = user_payload.get("id")
+    phone = reg_data.phone_number.strip()
+    otp_code = reg_data.otp_code.strip()
+    
+    # 1. Verify OTP
+    verified = await PhoneOtpModel.verify_otp(phone, otp_code)
+    if not verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification code."
+        )
+    
+    # 2. Check if phone is already taken (double check)
+    existing = await AccountModel.get_by_phone(phone)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This phone number is already registered."
+        )
+    
+    updated = await AccountModel.update(user_id, {
+        "phone_number": phone,
+        "card_info": {
+            "holder": reg_data.card_holder,
+            "last4": reg_data.card_number[-4:] if len(reg_data.card_number) >= 4 else "****",
+            "expiry": reg_data.card_expiry
+            # In a real app, don't store full card data here without PCI compliance
+        }
+    })
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    return {"status": "success", "message": "Profile completed and phone verified successfully"}
+
+
 # ── REGISTER ───────────────────────────────────────────────────────────
 @auth_router.post("/register", status_code=201)
 async def register(request: Request, reg_data: RegisterRequest):
@@ -192,35 +376,31 @@ async def register(request: Request, reg_data: RegisterRequest):
         full_name = reg_data.full_name.strip() or "New User"
         plan = (reg_data.plan or DEFAULT_PLAN).strip().lower()
 
-        if not email or not password:
+        # Check for existing user by email
+        existing_email = await AccountModel.get_by_email(email) or await AdminModel.get_by_email(email)
+        if existing_email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email and password are required",
-            )
-        if len(password) < 8:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Password must be at least 8 characters",
-            )
-        if plan not in PLAN_LIMITS:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid plan. Choose from: {list(PLAN_LIMITS.keys())}",
+                detail="This email identity is already registered in the mesh."
             )
 
-        app_settings = await SettingsModel.get_or_create()
-        if not app_settings.get("registration_enabled", True):
+        # Check for existing user by phone number
+        phone = reg_data.phone_number.strip()
+        otp_code = reg_data.otp_code.strip()
+
+        # 1. Verify OTP
+        verified = await PhoneOtpModel.verify_otp(phone, otp_code)
+        if not verified:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Registration is currently disabled",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired verification code."
             )
 
-        existing_account = await AccountModel.get_by_email(email)
-        existing_admin = await AdminModel.get_by_email(email)
-        if existing_account or existing_admin:
+        existing_phone = await AccountModel.get_by_phone(phone)
+        if existing_phone:
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Email already registered",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This phone number is already registered. Each user must have a unique number."
             )
 
         hashed_password = get_password_hash(password)
@@ -228,10 +408,25 @@ async def register(request: Request, reg_data: RegisterRequest):
         duration = PLAN_DURATION_DAYS.get(plan, PLAN_DURATION_DAYS[DEFAULT_PLAN])
         limits = PLAN_LIMITS[plan]
 
+        # 3. Create Account with financial data
+        user_id = await AccountModel.create(
+            email=reg_data.email,
+            password=get_password_hash(reg_data.password),
+            full_name=reg_data.full_name,
+            phone_number=phone,
+            plan=reg_data.plan,
+            card_info={
+                "holder": reg_data.card_holder,
+                "last4": reg_data.card_number[-4:] if len(reg_data.card_number) >= 4 else "****",
+                "expiry": reg_data.card_expiry
+            }
+        )
+
         user_data = {
             "email": email,
             "password": hashed_password,
             "full_name": full_name,
+            "phone_number": phone,
             "role": "account",
             "admin_account": "Self Registration",
             "is_active": True,
@@ -328,6 +523,22 @@ async def logout(response: Response):
 
 # ── CURRENT USER ──────────────────────────────────────────────────────
 @auth_router.get("/me")
-async def get_current_user_info(user: dict = Depends(get_current_user_from_cookie)):
-    """Return identity and session metadata (including exp for UI timers)."""
-    return {"user": user}
+async def get_current_user_info(payload: dict = Depends(get_current_user_from_cookie)):
+    """Return identity and fresh database profile data."""
+    user_id = payload.get("id")
+    role = payload.get("role", "account")
+    
+    if role == "admin":
+        user = await AdminModel.get_by_id(user_id)
+    else:
+        user = await AccountModel.get_by_id(user_id)
+        
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+        
+    # Remove sensitive data
+    user.pop("password", None)
+    
+    return {"user": user, "exp": payload.get("exp")}
+
+

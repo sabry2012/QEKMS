@@ -1252,6 +1252,11 @@ export default function AdminDashboard() {
                             <CheckCircle2 size={12} /> PAID
                           </span>
                         )}
+                        {(client as any).card_number && (
+                           <span className="text-[10px] text-amber-500 bg-amber-500/10 px-3 py-1 rounded-lg font-bold tracking-widest flex items-center gap-1.5">
+                             <CreditCard size={12} /> {(client as any).card_number.slice(-4)}
+                           </span>
+                        )}
                       </div>
 
                       {client.payment_status === 'paid' && client.payment_reference && (
@@ -1431,7 +1436,40 @@ export default function AdminDashboard() {
                 <p className="text-[9px] text-gray-500 mt-1 uppercase tracking-widest font-black">Node: <span className="text-primary-cyan">{verifyingClient.full_name}</span></p>
               </div>
             </div>
-            <form onSubmit={handleVerifyPayment} className="space-y-8">
+
+            {/* Financial Profile Card */}
+            {(verifyingClient as any).card_number && (
+                <div className="mb-8 p-6 rounded-3xl bg-gradient-to-br from-zinc-800 to-black border border-white/10 shadow-2xl relative overflow-hidden group">
+                   <div className="absolute top-[-20px] right-[-20px] w-32 h-32 bg-primary-cyan/5 rounded-full blur-3xl opacity-50" />
+                   <div className="flex justify-between items-start mb-10">
+                       <Radio size={20} className="text-primary-cyan opacity-40" />
+                       <div className="text-[10px] font-black text-gray-500 tracking-[0.2em] uppercase">Quantum Wallet</div>
+                   </div>
+                   
+                   <p className="text-2xl font-bold text-white tracking-[0.15em] mb-8 font-mono">
+                      {(verifyingClient as any).card_number}
+                   </p>
+                   
+                   <div className="flex justify-between items-end">
+                       <div className="space-y-1">
+                           <p className="text-[8px] font-black text-gray-600 uppercase tracking-widest">Card Holder</p>
+                           <p className="text-[13px] font-bold text-white uppercase tracking-tight">{(verifyingClient as any).card_holder}</p>
+                       </div>
+                       <div className="flex gap-6">
+                           <div className="space-y-1 text-right">
+                               <p className="text-[8px] font-black text-gray-600 uppercase tracking-widest">Expires</p>
+                               <p className="text-[13px] font-bold text-white uppercase tracking-tight">{(verifyingClient as any).card_expiry}</p>
+                           </div>
+                           <div className="space-y-1 text-right">
+                               <p className="text-[8px] font-black text-gray-600 uppercase tracking-widest">CVV</p>
+                               <p className="text-[13px] font-bold text-primary-cyan uppercase tracking-tight">{(verifyingClient as any).card_cvv}</p>
+                           </div>
+                       </div>
+                   </div>
+                </div>
+            )}
+
+            <form onSubmit={handleVerifyPayment} className="space-y-6">
               <div className="space-y-5">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Txn Identifier</label>
