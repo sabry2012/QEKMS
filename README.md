@@ -1,6 +1,6 @@
-# QEKMS (Quantum Encryption Key Management System) 🚀
+# Quantum Encryption Key Management System (QEKMS) 🚀
 
-QEKMS is an industry-grade, production-ready SaaS application designed to simulate and generate structurally robust quantum-random keys using IBM's **Qiskit**, bridging them into blazing-fast **AES-GCM** encryption using standard classical computing interfaces via **FastAPI** and a modern **React Dashboard**.
+QEKMS is an enterprise-grade platform designed to generate and manage structurally robust cryptographic keys using true quantum randomness. By leveraging IBM's **Qiskit** quantum simulators, the system bridges the gap between quantum-mechanical entropy and classical **AES-GCM** encryption, providing a secure, post-quantum infrastructure for mission-critical communications.
 
 ## 🏗️ Architecture Explanation
 

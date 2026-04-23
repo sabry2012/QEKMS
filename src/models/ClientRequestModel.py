@@ -68,3 +68,8 @@ class ClientRequestModel:
     async def count_by_status(cls, status: str) -> int:
         db = get_db()
         return await db[cls.collection_name].count_documents({"status": status, "is_deleted": {"$ne": True}})
+
+    @classmethod
+    async def count_by_email_and_type(cls, email: str, request_type: str) -> int:
+        db = get_db()
+        return await db[cls.collection_name].count_documents({"email": email, "type": request_type})

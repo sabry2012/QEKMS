@@ -60,8 +60,16 @@ async def submit_access_request(data: ClientRequestCreate):
 
     # Validate Email via Syntax and MX checks
     print(f"\n>>> ATTEMPTING CLIENT REQUEST FOR EMAIL: {data.email}")
+    
+    clean_email = str(data.email).strip().lower()
+    if not clean_email.endswith("@gmail.com"):
+        raise HTTPException(
+            status_code=400, 
+            detail="Security policy: Only @gmail.com addresses are permitted for client requests."
+        )
+
     try:
-        email_info = validate_email(str(data.email), check_deliverability=True)
+        email_info = validate_email(clean_email, check_deliverability=True)
         domain = email_info.domain.lower()
         if domain in DISPOSABLE_DOMAINS or any(d in domain for d in ["temp", "disposable", "throwaway", "10minute"]):
             raise HTTPException(status_code=400, detail="Disposable or temporary email addresses are strictly prohibited for enterprise network nodes.")

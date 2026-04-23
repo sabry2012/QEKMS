@@ -153,7 +153,7 @@ export default function Landing() {
         <div className="absolute top-[-200px] right-[-200px] w-[700px] h-[700px] rounded-full bg-primary-cyan/10 blur-[100px]" />
         <div className="absolute bottom-[-300px] left-[-200px] w-[800px] h-[800px] rounded-full bg-violet-500/10 blur-[100px]" />
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[length:48px_48px]" />
-        
+
         {/* Full-Page 3D Quantum Animation */}
         <div className="absolute inset-0 opacity-30">
           <QuantumAnimation />
@@ -202,19 +202,19 @@ export default function Landing() {
       <section className="relative z-10 pt-44 pb-32 px-8 text-center overflow-hidden">
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-10 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-400 bg-cyan-400/10 border border-cyan-400/25 shadow-[0_0_15px_rgba(34,211,238,0.1)]">
           <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)] animate-pulse" />
-          Military-Grade Encrypted Communication — Q4 2025
+          Military-Grade Encrypted Communication — Q4 2026
         </div>
 
         <h1 className="text-6xl md:text-8xl font-black tracking-tight leading-none mb-8">
-          Absolute Data<br />
+          Quantum Encryption<br />
           <span className="bg-clip-text text-transparent bg-mesh-gradient drop-shadow-[0_0_30px_rgba(6,182,212,0.4)]">
-            Sovereignty.
+            Key Management System
           </span>
         </h1>
 
-        <p className="text-gray-400 text-xl max-w-2xl mx-auto mb-14 leading-relaxed font-medium">
-          Stop gambling with legacy security. Protect your high-value assets with military-grade 
-          <span className="text-white font-semibold"> AES-256 GCM pipelines</span> designed to eliminate data exposure.
+        <p className="text-gray-400 text-xl max-w-3xl mx-auto mb-14 leading-relaxed font-medium">
+          Leveraging <span className="text-white font-semibold">IBM Qiskit</span> and quantum-randomness to generate structurally robust encryption keys.
+          Protect your high-value assets with post-quantum security pipelines designed to eliminate computational exposure.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

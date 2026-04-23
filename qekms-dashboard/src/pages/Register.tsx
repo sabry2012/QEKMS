@@ -101,6 +101,11 @@ export default function Register() {
   const handleSendOtp = async () => {
     setError('');
     const { full_name, email, password, phone_number } = formData;
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail.endsWith('@gmail.com')) {
+      setError('Security policy: Only @gmail.com addresses are permitted for node registration.');
+      return;
+    }
 
     // Strict Password Validation
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])[a-zA-Z\d!@#$%^&*(),.?":{}|<>]{10,}$/;

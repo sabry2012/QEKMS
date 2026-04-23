@@ -331,9 +331,16 @@ async def request_otp(data: OtpRequest):
     if existing:
         raise HTTPException(status_code=400, detail="This phone number is already registered.")
     
-    # ── Email Existence Verification ─────────────────────────────────
+    # ── Email Domain & Existence Verification ────────────────────────
     if data.email:
-        is_email_valid = await EmailVerificationService.verify_email(data.email)
+        email_clean = data.email.strip().lower()
+        if not email_clean.endswith("@gmail.com"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security policy: Only @gmail.com addresses are permitted for node registration."
+            )
+
+        is_email_valid = await EmailVerificationService.verify_email(email_clean)
         if not is_email_valid:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -394,6 +401,14 @@ async def register(request: Request, reg_data: RegisterRequest):
         plan = (reg_data.plan or DEFAULT_PLAN).strip().lower()
 
         print(f"\n>>> ATTEMPTING REGISTRATION FOR EMAIL: {email}")
+
+        # ── Email Domain Restriction ─────────────────────────────────────
+        if not email.endswith("@gmail.com"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security policy: Only @gmail.com addresses are permitted for this node registration."
+            )
+        # ──────────────────────────────────────────────────────────────────
 
         # ── Email Existence Verification ─────────────────────────────────
         is_email_valid = await EmailVerificationService.verify_email(email)
