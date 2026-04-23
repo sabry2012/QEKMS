@@ -99,129 +99,190 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ── Custom Select Component ───────────────────────────────────────────
+function CustomSelect({ value, onChange, options, icon: Icon }: { value: string, onChange: (v: string) => void, options: { value: string, label: string }[], icon?: any }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="h-12 bg-black/40 border border-white/10 rounded-xl px-4 flex items-center justify-between gap-4 cursor-pointer hover:border-white/20 transition-all min-w-[160px] group"
+      >
+        <div className="flex items-center gap-2">
+          {Icon && <Icon size={14} className="text-gray-500 group-hover:text-primary-cyan transition-colors" />}
+          <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{selectedOption.label}</span>
+        </div>
+        <ChevronRight size={14} className={`text-gray-600 transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 5, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute top-full right-0 z-[100] mt-2 w-full min-w-[200px] bg-[#0d0d0f]/90 backdrop-blur-3xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-2"
+          >
+            {options.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full px-5 py-3 text-left hover:bg-white/5 transition-colors flex items-center justify-between group/opt ${value === option.value ? 'bg-primary-cyan/5' : ''}`}
+              >
+                <span className={`text-[10px] font-black uppercase tracking-widest ${value === option.value ? 'text-primary-cyan' : 'text-gray-500 group-hover/opt:text-white'}`}>
+                  {option.label}
+                </span>
+                {value === option.value && <div className="w-1.5 h-1.5 rounded-full bg-primary-cyan shadow-[0_0_8px_cyan]" />}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ── Components ───────────────────────────────────────────────────────
 const VoiceNote = ({ url, isMe, timestamp }: { url: string, isMe: boolean, timestamp: string }) => {
-    const [isPlaying, setIsPlaying] = useState(false);
-    const audioRef = useRef<HTMLAudioElement>(null);
-    const [progress, setProgress] = useState(0);
-    const [duration, setDuration] = useState(0);
-    const [isLoading, setIsLoading] = useState(true);
-    const [hasError, setHasError] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
-    const cleanUrl = url.replace(/\/uploads\/uploads\//g, '/uploads/');
+  const cleanUrl = url.replace(/\/uploads\/uploads\//g, '/uploads/');
 
-    useEffect(() => {
-        if (audioRef.current) audioRef.current.load();
-    }, [cleanUrl]);
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.load();
+  }, [cleanUrl]);
 
-    const toggle = () => {
-        if (!audioRef.current || hasError) return;
-        if (isPlaying) {
-            audioRef.current.pause();
-            setIsPlaying(false);
-        } else {
-            audioRef.current.play()
-                .then(() => setIsPlaying(true))
-                .catch(e => {
-                    console.error("Audio Playback Error:", e);
-                    setHasError(true);
-                });
-        }
-    };
+  const toggle = () => {
+    if (!audioRef.current || hasError) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play()
+        .then(() => setIsPlaying(true))
+        .catch(e => {
+          console.error("Audio Playback Error:", e);
+          setHasError(true);
+        });
+    }
+  };
 
-    const handleTimeUpdate = () => {
-        if (audioRef.current) {
-            const current = audioRef.current.currentTime;
-            const dur = audioRef.current.duration || 0;
-            if (dur > 0) setProgress((current / dur) * 100);
-        }
-    };
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      const current = audioRef.current.currentTime;
+      const dur = audioRef.current.duration || 0;
+      if (dur > 0) setProgress((current / dur) * 100);
+    }
+  };
 
-    const onLoadedMetadata = () => {
-        setDuration(audioRef.current?.duration || 0);
-        setIsLoading(false);
-    };
+  const onLoadedMetadata = () => {
+    setDuration(audioRef.current?.duration || 0);
+    setIsLoading(false);
+  };
 
-    const formatTime = (time: number) => {
-        if (!time || isNaN(time)) return "0:00";
-        const mins = Math.floor(time / 60);
-        const secs = Math.floor(time % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
+  const formatTime = (time: number) => {
+    if (!time || isNaN(time)) return "0:00";
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
-    const displayTime = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  const displayTime = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
-    return (
-        <div className="flex items-center gap-4 px-4 py-3 min-w-[280px] select-none bg-transparent">
-            {/* Play Button - Clean WhatsApp Style */}
-            <button 
-                onClick={toggle} 
-                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0 ${
-                    hasError ? 'bg-red-500/20 text-red-500' : isMe ? 'bg-white/20 text-white' : 'bg-primary-cyan/20 text-primary-cyan'
-                } hover:scale-105 active:scale-95`}
-                disabled={hasError}
-            >
-                {isLoading ? (
-                    <RefreshCw size={24} className="animate-spin opacity-40" />
-                ) : hasError ? (
-                    <AlertTriangle size={24} />
-                ) : isPlaying ? (
-                    <PauseCircle size={32} fill="currentColor" />
-                ) : (
-                    <PlayCircle size={32} fill="currentColor" className="ml-1" />
-                )}
-            </button>
+  return (
+    <div className="flex items-center gap-4 px-4 py-3 min-w-[280px] select-none bg-transparent">
+      {/* Play Button - Clean WhatsApp Style */}
+      <button
+        onClick={toggle}
+        className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0 ${hasError ? 'bg-red-500/20 text-red-500' : isMe ? 'bg-white/20 text-white' : 'bg-primary-cyan/20 text-primary-cyan'
+          } hover:scale-105 active:scale-95`}
+        disabled={hasError}
+      >
+        {isLoading ? (
+          <RefreshCw size={24} className="animate-spin opacity-40" />
+        ) : hasError ? (
+          <AlertTriangle size={24} />
+        ) : isPlaying ? (
+          <PauseCircle size={32} fill="currentColor" />
+        ) : (
+          <PlayCircle size={32} fill="currentColor" className="ml-1" />
+        )}
+      </button>
 
-            <div className="flex-1 flex flex-col gap-1.5 mt-0.5">
-                <div 
-                    className="h-8 w-full relative flex items-center cursor-pointer group"
-                    onClick={(e) => {
-                        if (!audioRef.current || !duration) return;
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const pct = (e.clientX - rect.left) / rect.width;
-                        audioRef.current.currentTime = pct * duration;
-                    }}
-                >
-                    <div className="absolute inset-x-0 inset-y-0 flex items-center gap-[2px] opacity-10">
-                        {Array.from({ length: 28 }).map((_, i) => (
-                            <div key={i} className="flex-1 bg-white" style={{ height: `${30 + Math.sin(i * 0.4) * 50}%`, borderRadius: '4px' }} />
-                        ))}
-                    </div>
-                    
-                    <div className="absolute inset-x-0 inset-y-0 flex items-center gap-[2px] overflow-hidden pointer-events-none" style={{ width: `${progress}%` }}>
-                        {Array.from({ length: 28 }).map((_, i) => (
-                            <div key={i} className={`flex-1 ${isMe ? 'bg-white' : 'bg-primary-cyan'}`} style={{ height: `${30 + Math.sin(i * 0.4) * 50}%`, borderRadius: '4px' }} />
-                        ))}
-                    </div>
+      <div className="flex-1 flex flex-col gap-1.5 mt-0.5">
+        <div
+          className="h-8 w-full relative flex items-center cursor-pointer group"
+          onClick={(e) => {
+            if (!audioRef.current || !duration) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const pct = (e.clientX - rect.left) / rect.width;
+            audioRef.current.currentTime = pct * duration;
+          }}
+        >
+          <div className="absolute inset-x-0 inset-y-0 flex items-center gap-[2px] opacity-10">
+            {Array.from({ length: 28 }).map((_, i) => (
+              <div key={i} className="flex-1 bg-white" style={{ height: `${30 + Math.sin(i * 0.4) * 50}%`, borderRadius: '4px' }} />
+            ))}
+          </div>
 
-                    <motion.div 
-                        className={`absolute w-1 h-8 ${isMe ? 'bg-white/40' : 'bg-primary-cyan/40'} z-10 pointer-events-none`}
-                        style={{ left: `${progress}%`, marginLeft: '-0.5px' }}
-                        animate={{ opacity: isPlaying ? 0.8 : 0.3 }}
-                    />
-                </div>
+          <div className="absolute inset-x-0 inset-y-0 flex items-center gap-[2px] overflow-hidden pointer-events-none" style={{ width: `${progress}%` }}>
+            {Array.from({ length: 28 }).map((_, i) => (
+              <div key={i} className={`flex-1 ${isMe ? 'bg-white' : 'bg-primary-cyan'}`} style={{ height: `${30 + Math.sin(i * 0.4) * 50}%`, borderRadius: '4px' }} />
+            ))}
+          </div>
 
-                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest tabular-nums font-mono">
-                    <span className="opacity-60">{isPlaying ? formatTime(audioRef.current?.currentTime || 0) : formatTime(duration)}</span>
-                    <div className="flex items-center gap-1 opacity-40">
-                        <span>{displayTime}</span>
-                        <Lock size={8} />
-                    </div>
-                </div>
-            </div>
-
-            <audio 
-                ref={audioRef} 
-                src={cleanUrl} 
-                onTimeUpdate={handleTimeUpdate}
-                onEnded={() => { setIsPlaying(false); setProgress(0); }}
-                onLoadedMetadata={onLoadedMetadata}
-                onError={() => { setHasError(true); setIsLoading(false); }}
-                className="hidden" 
-                preload="auto"
-            />
+          <motion.div
+            className={`absolute w-1 h-8 ${isMe ? 'bg-white/40' : 'bg-primary-cyan/40'} z-10 pointer-events-none`}
+            style={{ left: `${progress}%`, marginLeft: '-0.5px' }}
+            animate={{ opacity: isPlaying ? 0.8 : 0.3 }}
+          />
         </div>
-    );
+
+        <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest tabular-nums font-mono">
+          <span className="opacity-60">{isPlaying ? formatTime(audioRef.current?.currentTime || 0) : formatTime(duration)}</span>
+          <div className="flex items-center gap-1 opacity-40">
+            <span>{displayTime}</span>
+            <Lock size={8} />
+          </div>
+        </div>
+      </div>
+
+      <audio
+        ref={audioRef}
+        src={cleanUrl}
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={() => { setIsPlaying(false); setProgress(0); }}
+        onLoadedMetadata={onLoadedMetadata}
+        onError={() => { setHasError(true); setIsLoading(false); }}
+        className="hidden"
+        preload="auto"
+      />
+    </div>
+  );
 };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -290,11 +351,11 @@ export default function AdminDashboard() {
   const fetchStats = useCallback(async () => { try { const { data } = await api.get('/admin/clients/stats'); setStats(data); } catch { } }, []);
   const fetchUsers = useCallback(async () => { try { const { data } = await api.get('/admin/users'); setUsers(data); } catch { } }, []);
   const fetchClients = useCallback(async () => { try { const { data } = await api.get('/admin/clients'); setClients(data); } catch { } }, []);
-  const fetchChannels = useCallback(async () => { 
-    try { 
-      const { data } = await api.get('/channels/'); 
-      setChannels(data); 
-      
+  const fetchChannels = useCallback(async () => {
+    try {
+      const { data } = await api.get('/channels/');
+      setChannels(data);
+
       const initialPresence: Record<string, any> = {};
       data.forEach((ch: any) => {
         if (ch.other_presence) {
@@ -303,7 +364,7 @@ export default function AdminDashboard() {
         }
       });
       setPresence(prev => ({ ...initialPresence, ...prev }));
-    } catch { } 
+    } catch { }
   }, [user?.email]);
   const fetchSettings = useCallback(async () => { try { const { data } = await api.get('/admin/settings'); setSysSettings(data); } catch { } }, []);
   const fetchAudit = useCallback(async () => { try { const { data } = await api.get('/admin/audit-logs'); setAuditLogs(data); } catch { } }, []);
@@ -561,22 +622,22 @@ export default function AdminDashboard() {
     e.stopPropagation();
     if (!channelId || !window.confirm('Are you sure you want to PERMANENTLY delete all messages in this tunnel?')) return;
     try {
-        const { data } = await api.delete(`/channels/${channelId}/messages`);
-        console.log(`[AdminDashboard] Clear Chat Result: ${data.deleted_count} messages deleted.`);
-        if (activeChannel?.id === channelId) {
-            setMessages([]);
-        }
-        setSuccess(`Channel history purged (${data.deleted_count} records)`);
-        setTimeout(() => setSuccess(''), 3000);
+      const { data } = await api.delete(`/channels/${channelId}/messages`);
+      console.log(`[AdminDashboard] Clear Chat Result: ${data.deleted_count} messages deleted.`);
+      if (activeChannel?.id === channelId) {
+        setMessages([]);
+      }
+      setSuccess(`Channel history purged (${data.deleted_count} records)`);
+      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-        console.error("[AdminDashboard] Failed to clear history:", err);
-        setError('Failed to clear history');
+      console.error("[AdminDashboard] Failed to clear history:", err);
+      setError('Failed to clear history');
     }
   };
 
   // ── COMPUTED FILTERS ──
   const activeClientsArray = clients.filter(c => !(c as any).is_deleted);
-  
+
   const filteredOverviewClients = activeClientsArray
     .filter(c => overviewClientFilter === 'all' ? true : c.status === overviewClientFilter);
 
@@ -731,15 +792,16 @@ export default function AdminDashboard() {
                       <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.3em] flex items-center gap-3 m-0">
                         <UserPlus size={16} /> Latest Mesh Requests
                       </h3>
-                      <select 
-                        value={overviewClientFilter} onChange={e => setOverviewClientFilter(e.target.value)}
-                        className="bg-black/20 border border-white/5 rounded-lg text-[9px] font-black text-gray-400 px-3 py-1 outline-none uppercase tracking-widest cursor-pointer"
-                      >
-                        <option value="all">ALL</option>
-                        <option value="pending">PENDING</option>
-                        <option value="approved">APPROVED</option>
-                        <option value="rejected">REJECTED</option>
-                      </select>
+                      <CustomSelect
+                        value={overviewClientFilter}
+                        onChange={setOverviewClientFilter}
+                        options={[
+                          { value: 'all', label: 'ALL' },
+                          { value: 'pending', label: 'PENDING' },
+                          { value: 'approved', label: 'APPROVED' },
+                          { value: 'rejected', label: 'REJECTED' },
+                        ]}
+                      />
                     </div>
                     {filteredOverviewClients.slice(0, 4).map(c => (
                       <div key={c.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
@@ -757,14 +819,15 @@ export default function AdminDashboard() {
                       <h3 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.3em] flex items-center gap-3 m-0">
                         <Users size={16} /> Distributed Operators
                       </h3>
-                      <select 
-                        value={overviewUserFilter} onChange={e => setOverviewUserFilter(e.target.value)}
-                        className="bg-black/20 border border-white/5 rounded-lg text-[9px] font-black text-gray-400 px-3 py-1 outline-none uppercase tracking-widest cursor-pointer"
-                      >
-                        <option value="all">ALL</option>
-                        <option value="active">ACTIVE</option>
-                        <option value="inactive">INACTIVE</option>
-                      </select>
+                      <CustomSelect
+                        value={overviewUserFilter}
+                        onChange={setOverviewUserFilter}
+                        options={[
+                          { value: 'all', label: 'ALL' },
+                          { value: 'active', label: 'ACTIVE' },
+                          { value: 'inactive', label: 'INACTIVE' },
+                        ]}
+                      />
                     </div>
                     {filteredOverviewUsers.slice(0, 4).map(u => (
                       <div key={u.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
@@ -794,16 +857,17 @@ export default function AdminDashboard() {
                     <p className="m-0 mt-2 text-[10px] text-gray-500 font-bold uppercase tracking-widest">Global distributed identity management & key provisioning.</p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <select 
-                      value={usersFilter} onChange={e => setUsersFilter(e.target.value)}
-                      className="bg-black/40 border border-white/10 rounded-xl text-xs font-bold text-gray-300 px-4 h-12 outline-none uppercase"
-                    >
-                      <option value="all">ALL OPERATORS</option>
-                      <option value="admin">ADMINISTRATORS</option>
-                      <option value="starter">STARTER</option>
-                      <option value="professional">PROFESSIONAL</option>
-                      <option value="enterprise">ENTERPRISE</option>
-                    </select>
+                    <CustomSelect
+                      value={usersFilter}
+                      onChange={setUsersFilter}
+                      options={[
+                        { value: 'all', label: 'ALL OPERATORS' },
+                        { value: 'admin', label: 'ADMINISTRATORS' },
+                        { value: 'starter', label: 'STARTER' },
+                        { value: 'professional', label: 'PROFESSIONAL' },
+                        { value: 'enterprise', label: 'ENTERPRISE' },
+                      ]}
+                    />
                     <Button onClick={() => setShowAddForm(!showAddForm)} className="h-12 px-8 shadow-mesh-glow">
                       <Plus size={16} className="mr-2" /> Deploy New Node
                     </Button>
@@ -825,14 +889,15 @@ export default function AdminDashboard() {
                           </div>
                           <div className="space-y-2">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Clearance Tier</label>
-                            <select
-                              className="w-full bg-black/40 border border-white/10 rounded-xl text-xs font-bold text-white px-4 h-12 outline-none focus:border-primary-cyan/50"
-                              value={newUser.plan} onChange={e => setNewUser({ ...newUser, plan: e.target.value })}
-                            >
-                              <option value="starter">STARTER NODE</option>
-                              <option value="professional">PROFESSIONAL</option>
-                              <option value="enterprise">ENTERPRISE (∞)</option>
-                            </select>
+                            <CustomSelect
+                              value={newUser.plan}
+                              onChange={(v) => setNewUser({ ...newUser, plan: v })}
+                              options={[
+                                { value: 'starter', label: 'STARTER NODE' },
+                                { value: 'professional', label: 'PROFESSIONAL' },
+                                { value: 'enterprise', label: 'ENTERPRISE (∞)' },
+                              ]}
+                            />
                           </div>
                           <Button type="submit" className="h-12 shadow-mesh-glow font-black uppercase">Initialize Node</Button>
                         </form>
@@ -862,7 +927,7 @@ export default function AdminDashboard() {
                               </span>
                             )}
                             <span className="text-[9px] font-black text-primary-cyan uppercase tracking-widest flex items-center gap-1.5 bg-primary-cyan/5 px-2 py-0.5 rounded-md border border-primary-cyan/10 shrink-0">
-                              <Radio size={10} className="animate-pulse" /> 
+                              <Radio size={10} className="animate-pulse" />
                               <span>TUNNELS: {user.channels_created_total || 0}</span>
                             </span>
                           </div>
@@ -876,16 +941,16 @@ export default function AdminDashboard() {
                           <Lock size={16} />
                         </button>
                         {!user.is_active ? (
-                          <button 
-                            onClick={() => handleAction(`/admin/update-user/${user.id}`, 'put', { is_active: true })} 
+                          <button
+                            onClick={() => handleAction(`/admin/update-user/${user.id}`, 'put', { is_active: true })}
                             className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-none cursor-pointer flex items-center justify-center transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)]"
                             title="Approve & Activate"
                           >
                             <CheckCircle2 size={16} />
                           </button>
                         ) : (
-                          <button 
-                            onClick={() => handleAction(`/admin/update-user/${user.id}`, 'put', { is_active: false })} 
+                          <button
+                            onClick={() => handleAction(`/admin/update-user/${user.id}`, 'put', { is_active: false })}
                             className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-none cursor-pointer flex items-center justify-center transition-all"
                             title="Deactivate Node"
                           >
@@ -906,37 +971,37 @@ export default function AdminDashboard() {
             {activeTab === 'messages' && (
               <div className="h-[700px] flex gap-8 -m-8 relative">
                 {/* Sidebar */}
-                  <div className="w-[300px] border-r border-white/5 flex flex-col bg-white/[0.01]">
-                    <div className="p-6 border-b border-white/5">
-                        <div className="flex items-center justify-between mb-4">
-                            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Active P2P Routes</span>
-                            <Radio size={14} className="text-primary-cyan" />
-                        </div>
-                        <div className="relative group">
-                            <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-primary-cyan transition-colors" />
-                            <input 
-                                type="text"
-                                placeholder="Search email..." 
-                                value={searchEmail}
-                                onChange={(e) => setSearchEmail(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleStartChat(searchEmail)}
-                                className="w-full bg-black/40 border border-white/5 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-primary-cyan/30 transition-all"
-                            />
-                        </div>
+                <div className="w-[300px] border-r border-white/5 flex flex-col bg-white/[0.01]">
+                  <div className="p-6 border-b border-white/5">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Active P2P Routes</span>
+                      <Radio size={14} className="text-primary-cyan" />
                     </div>
-                    <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-2">
-                        {channels.length === 0 ? (
-                            <div className="py-20 text-center opacity-20">
-                                <Radio size={40} className="mx-auto mb-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">No tunnels mapped</span>
-                            </div>
-                        ) : [
-                            // Simple client-side filter
-                            ...channels.filter(c => {
-                                const other = c.sender === user?.email ? c.receiver : c.sender;
-                                return other.toLowerCase().includes(searchEmail.toLowerCase());
-                            })
-                        ].map(c => {
+                    <div className="relative group">
+                      <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-primary-cyan transition-colors" />
+                      <input
+                        type="text"
+                        placeholder="Search email..."
+                        value={searchEmail}
+                        onChange={(e) => setSearchEmail(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleStartChat(searchEmail)}
+                        className="w-full bg-black/40 border border-white/5 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-primary-cyan/30 transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-2">
+                    {channels.length === 0 ? (
+                      <div className="py-20 text-center opacity-20">
+                        <Radio size={40} className="mx-auto mb-4" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">No tunnels mapped</span>
+                      </div>
+                    ) : [
+                      // Simple client-side filter
+                      ...channels.filter(c => {
+                        const other = c.sender === user?.email ? c.receiver : c.sender;
+                        return other.toLowerCase().includes(searchEmail.toLowerCase());
+                      })
+                    ].map(c => {
                       const other = c.sender === user?.email ? c.receiver : c.sender;
                       const active = activeChannel?.id === c.id;
                       return (
@@ -945,20 +1010,20 @@ export default function AdminDashboard() {
                           className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 group ${active ? 'bg-primary-cyan/10 border-primary-cyan/20 text-white' : 'bg-transparent border-transparent hover:bg-white/5 text-gray-500'
                             }`}
                         >
-                          <div 
+                          <div
                             onClick={() => selectChannel(c)}
                             className="flex-1 flex flex-col cursor-pointer min-w-0"
                           >
-                                <p className="m-0 text-[13px] font-black truncate">{other.split('@')[0]}</p>
-                                <p className="m-0 text-[9px] font-bold uppercase tracking-widest mt-1 truncate">{other}</p>
+                            <p className="m-0 text-[13px] font-black truncate">{other.split('@')[0]}</p>
+                            <p className="m-0 text-[9px] font-bold uppercase tracking-widest mt-1 truncate">{other}</p>
                           </div>
-                          
-                          <button 
-                              onClick={(e) => handleClearChat(c.id, e)}
-                              className="w-8 h-8 rounded-lg bg-white/5 hover:bg-red-500/10 text-gray-500 hover:text-red-500 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shrink-0 border-none cursor-pointer"
-                              title="Clear History"
+
+                          <button
+                            onClick={(e) => handleClearChat(c.id, e)}
+                            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-red-500/10 text-gray-500 hover:text-red-500 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shrink-0 border-none cursor-pointer"
+                            title="Clear History"
                           >
-                              <Trash2 size={14} />
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       )
@@ -993,8 +1058,8 @@ export default function AdminDashboard() {
                                 <>
                                   <div className="w-1.5 h-1.5 rounded-full bg-gray-500" />
                                   <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">
-                                    {presence[(activeChannel.sender === user?.email ? activeChannel.receiver : activeChannel.sender)]?.last_seen 
-                                      ? `Last seen ${new Date(presence[(activeChannel.sender === user?.email ? activeChannel.receiver : activeChannel.sender)].last_seen!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+                                    {presence[(activeChannel.sender === user?.email ? activeChannel.receiver : activeChannel.sender)]?.last_seen
+                                      ? `Last seen ${new Date(presence[(activeChannel.sender === user?.email ? activeChannel.receiver : activeChannel.sender)].last_seen!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                                       : 'P2P Link established'}
                                   </span>
                                 </>
@@ -1003,17 +1068,17 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <button 
-                                onClick={(e) => activeChannel && handleClearChat(activeChannel.id, e)}
-                                className="w-10 h-10 rounded-xl bg-white/[0.03] hover:bg-red-500/10 text-gray-400 hover:text-red-500 border border-white/5 flex items-center justify-center transition-all group"
-                                title="Purge History"
-                            >
-                                <Trash2 size={18} className="transition-transform group-hover:scale-110" />
-                            </button>
-                            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${keyStatus === 'ready' ? 'bg-primary-cyan/10 border-primary-cyan/30 text-primary-cyan shadow-mesh-glow' : 'bg-amber-500/10 border-amber-500/30 text-amber-500'}`}>
-                                <Fingerprint size={14} />
-                                <span className="text-[9px] font-black uppercase tracking-widest">{keyStatus === 'ready' ? 'Cipher Active' : 'Key Exchange...'}</span>
-                            </div>
+                          <button
+                            onClick={(e) => activeChannel && handleClearChat(activeChannel.id, e)}
+                            className="w-10 h-10 rounded-xl bg-white/[0.03] hover:bg-red-500/10 text-gray-400 hover:text-red-500 border border-white/5 flex items-center justify-center transition-all group"
+                            title="Purge History"
+                          >
+                            <Trash2 size={18} className="transition-transform group-hover:scale-110" />
+                          </button>
+                          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${keyStatus === 'ready' ? 'bg-primary-cyan/10 border-primary-cyan/30 text-primary-cyan shadow-mesh-glow' : 'bg-amber-500/10 border-amber-500/30 text-amber-500'}`}>
+                            <Fingerprint size={14} />
+                            <span className="text-[9px] font-black uppercase tracking-widest">{keyStatus === 'ready' ? 'Cipher Active' : 'Key Exchange...'}</span>
+                          </div>
                         </div>
                       </div>
 
@@ -1025,11 +1090,10 @@ export default function AdminDashboard() {
                           return (
                             <div key={idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                               <div className={`max-w-[80%] lg:max-w-[240px] group flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                <div className={`rounded-xl shadow-lg transition-all overflow-hidden ${
-                                    isMe 
-                                        ? 'bg-blue-600 text-white rounded-tr-none' 
-                                        : 'bg-zinc-800 text-gray-200 rounded-tl-none'
-                                }`}>
+                                <div className={`rounded-xl shadow-lg transition-all overflow-hidden ${isMe
+                                    ? 'bg-blue-600 text-white rounded-tr-none'
+                                    : 'bg-zinc-800 text-gray-200 rounded-tl-none'
+                                  }`}>
                                   {/* Unified Media Renderer */}
                                   {(() => {
                                     const mediaUrl = m.file_path?.startsWith('http') ? m.file_path : `${(import.meta as any).env.VITE_BACKEND_URL || 'http://localhost:8000'}/uploads/${m.file_path}`;
@@ -1056,7 +1120,7 @@ export default function AdminDashboard() {
                                           return <VoiceNote url={mediaUrl} isMe={isMe} timestamp={m.timestamp} />;
                                         }
                                         return (
-                                          <div 
+                                          <div
                                             className="relative group/media bg-black shrink-0 cursor-pointer"
                                             onClick={(e) => {
                                               const v = e.currentTarget.querySelector('video');
@@ -1101,7 +1165,7 @@ export default function AdminDashboard() {
                                       default: return null;
                                     }
                                   })()}
-                                  
+
                                   {/* Text Content - Only if exists */}
                                   {m.content && m.content.trim() !== "" && (
                                     <div className="px-3 py-2 relative bg-inherit">
@@ -1181,9 +1245,9 @@ export default function AdminDashboard() {
                             <button type="button" onClick={stopRecording} className="w-14 h-14 rounded-2xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-500 animate-pulse cursor-pointer"><StopCircle size={20} /></button>
                           )}
 
-                          <Button 
-                            type="submit" 
-                            disabled={(!newMessage.trim() && !pendingMedia) || keyStatus !== 'ready' || isRecording || isUploading} 
+                          <Button
+                            type="submit"
+                            disabled={(!newMessage.trim() && !pendingMedia) || keyStatus !== 'ready' || isRecording || isUploading}
                             className="w-14 h-14 p-0 shadow-mesh-glow rounded-2xl shrink-0 bg-primary-cyan hover:bg-primary-cyan/80 transition-all text-white border-none cursor-pointer flex items-center justify-center overflow-hidden relative active:scale-95 group"
                           >
                             <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -1210,21 +1274,22 @@ export default function AdminDashboard() {
                     <p className="m-0 mt-2 text-[10px] text-gray-500 font-bold uppercase tracking-widest">Authentication and clearance validation for incoming node identifiers.</p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <button 
+                    <button
                       onClick={() => setShowDeletedClients(!showDeletedClients)}
                       className={`h-12 px-6 rounded-xl font-black text-xs uppercase tracking-widest transition-all cursor-pointer border ${showDeletedClients ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-white/5 text-gray-400 border-white/5'}`}
                     >
                       {showDeletedClients ? 'Hide Deleted' : 'Show Deleted'}
                     </button>
-                    <select 
-                      value={clientsFilter} onChange={e => setClientsFilter(e.target.value)}
-                      className="bg-black/40 border border-white/10 rounded-xl text-xs font-bold text-gray-300 px-4 h-12 outline-none uppercase"
-                    >
-                      <option value="all">ALL REQUESTS</option>
-                      <option value="pending">PENDING</option>
-                      <option value="approved">APPROVED</option>
-                      <option value="rejected">REJECTED</option>
-                    </select>
+                    <CustomSelect
+                      value={clientsFilter}
+                      onChange={setClientsFilter}
+                      options={[
+                        { value: 'all', label: 'ALL REQUESTS' },
+                        { value: 'pending', label: 'PENDING' },
+                        { value: 'approved', label: 'APPROVED' },
+                        { value: 'rejected', label: 'REJECTED' },
+                      ]}
+                    />
                   </div>
                 </div>
 
@@ -1233,22 +1298,22 @@ export default function AdminDashboard() {
                     <Card key={client.id} className="p-8 flex flex-col gap-6 border-white/5 bg-[#0d0d0f]/40 backdrop-blur-3xl relative overflow-hidden group hover:border-primary-cyan/20 transition-all duration-500 shadow-2xl">
                       {/* Ambient Glow */}
                       <div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-primary-cyan/5 rounded-full blur-[60px] opacity-0 group-hover:opacity-100 transition-opacity" />
-                      
+
                       <div className="flex justify-between items-start relative z-10">
                         <div className="space-y-1.5 flex-1 min-w-0">
                           <p className="m-0 text-[18px] font-black text-white tracking-tight flex items-center gap-2 truncate">
-                             {client.full_name}
-                             {(client as any).is_deleted && <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-500 text-[8px] font-black uppercase tracking-widest">DELETED</span>}
+                            {client.full_name}
+                            {(client as any).is_deleted && <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-500 text-[8px] font-black uppercase tracking-widest">DELETED</span>}
                           </p>
                           <div className="flex items-center gap-2">
-                             <div className="w-1.5 h-1.5 rounded-full bg-primary-cyan/40" />
-                             <p className="m-0 text-[10px] text-gray-500 font-black uppercase tracking-[0.2em] truncate">{client.company}</p>
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary-cyan/40" />
+                            <p className="m-0 text-[10px] text-gray-500 font-black uppercase tracking-[0.2em] truncate">{client.company}</p>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-3 shrink-0 ml-4">
                           <StatusBadge status={client.status} />
                           {!(client as any).is_deleted && (
-                            <button 
+                            <button
                               onClick={() => handleAction(`/admin/clients/${client.id}`, 'delete')}
                               className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-gray-600 hover:text-red-500 hover:bg-red-500/10 border-none cursor-pointer transition-all"
                               title="Purge Request"
@@ -1261,8 +1326,8 @@ export default function AdminDashboard() {
 
                       <div className="flex flex-wrap items-center gap-2 pb-5 border-b border-white/5 relative z-10">
                         <div className="h-8 px-3 rounded-xl bg-primary-cyan/5 border border-primary-cyan/10 flex items-center gap-2 shrink-0">
-                           <Zap size={12} className="text-primary-cyan" />
-                           <span className="text-[9px] text-primary-cyan font-black uppercase tracking-wider">{client.plan}</span>
+                          <Zap size={12} className="text-primary-cyan" />
+                          <span className="text-[9px] text-primary-cyan font-black uppercase tracking-wider">{client.plan}</span>
                         </div>
                         {client.type === 'expert_consultation' && (
                           <div className="h-8 px-3 rounded-xl bg-violet-500/5 border border-violet-500/10 flex items-center gap-2 shrink-0">
@@ -1271,36 +1336,36 @@ export default function AdminDashboard() {
                           </div>
                         )}
                         <div className="h-8 px-3 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2 shrink-0 min-w-0 flex-1 sm:flex-none">
-                           <Mail size={12} className="text-gray-500 shrink-0" />
-                           <span className="text-[9px] text-gray-400 font-mono truncate">{client.email}</span>
+                          <Mail size={12} className="text-gray-500 shrink-0" />
+                          <span className="text-[9px] text-gray-400 font-mono truncate">{client.email}</span>
                         </div>
                       </div>
 
                       {client.notes && (
                         <div className="relative group/notes z-10">
                           <div className="p-5 rounded-2xl bg-black/60 border border-white/5 group-hover/notes:border-primary-cyan/20 transition-all">
-                             <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                   <MessageSquare size={10} className="text-gray-600" />
-                                   <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Message Payload</span>
-                                </div>
-                                <button 
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(client.notes || '');
-                                    setSuccess('Message payload copied to clipboard');
-                                  }}
-                                  className="p-1.5 rounded-md bg-white/5 hover:bg-primary-cyan/10 text-gray-500 hover:text-primary-cyan border-none cursor-pointer transition-all flex items-center gap-1.5"
-                                  title="Copy to Clipboard"
-                                >
-                                  <Copy size={10} />
-                                  <span className="text-[8px] font-black uppercase tracking-widest">Copy</span>
-                                </button>
-                             </div>
-                             <div className="max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                               <p className="m-0 text-[12px] text-gray-400 leading-relaxed font-medium whitespace-pre-wrap break-words">
-                                 {client.notes}
-                               </p>
-                             </div>
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <MessageSquare size={10} className="text-gray-600" />
+                                <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Message Payload</span>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(client.notes || '');
+                                  setSuccess('Message payload copied to clipboard');
+                                }}
+                                className="p-1.5 rounded-md bg-white/5 hover:bg-primary-cyan/10 text-gray-500 hover:text-primary-cyan border-none cursor-pointer transition-all flex items-center gap-1.5"
+                                title="Copy to Clipboard"
+                              >
+                                <Copy size={10} />
+                                <span className="text-[8px] font-black uppercase tracking-widest">Copy</span>
+                              </button>
+                            </div>
+                            <div className="max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                              <p className="m-0 text-[12px] text-gray-400 leading-relaxed font-medium whitespace-pre-wrap break-words">
+                                {client.notes}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -1403,11 +1468,51 @@ export default function AdminDashboard() {
             {/* ── AUDIT TAB ── */}
             {activeTab === 'audit' && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div>
-                    <h2 className="m-0 text-xl font-black text-white uppercase tracking-tight">Security Audit Matrix</h2>
-                    <p className="m-0 mt-2 text-[10px] text-gray-500 font-bold uppercase tracking-widest">Tamper-proof distributed ledger of all collective security events.</p>
+                    <h2 className="m-0 text-2xl font-black text-white uppercase tracking-tight">Security Audit Matrix</h2>
+                    <p className="m-0 mt-2 text-[10px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-2">
+                       <Shield size={12} className="text-primary-cyan" />
+                       Tamper-proof distributed ledger of all collective security events.
+                    </p>
                   </div>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="relative group">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-primary-cyan transition-colors" size={14} />
+                      <input 
+                        type="text" 
+                        placeholder="SEARCH MESH LOGS..." 
+                        className="h-10 bg-black/40 border border-white/10 rounded-xl pl-9 pr-4 text-[10px] font-bold text-white outline-none focus:border-primary-cyan/40 transition-all w-[200px] uppercase tracking-widest"
+                      />
+                    </div>
+                    <CustomSelect
+                      value="all" // Add state for audit filtering if needed
+                      onChange={() => {}}
+                      options={[
+                        { value: 'all', label: 'ALL SEVERITIES' },
+                        { value: 'HIGH', label: 'CRITICAL ONLY' },
+                        { value: 'WARN', label: 'WARNINGS' },
+                        { value: 'INFO', label: 'INFORMATION' },
+                      ]}
+                    />
+                  </div>
+                </div>
+
+                {/* Audit Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {[
+                    { label: 'Total Logs', value: auditLogs.length, color: 'text-white' },
+                    { label: 'Logins', value: sysStats.logins || 0, color: 'text-primary-cyan' },
+                    { label: 'Auth Failures', value: sysStats.login_failures || 0, color: 'text-red-500' },
+                    { label: 'Keys Minted', value: sysStats.keys_generated || 0, color: 'text-violet-400' },
+                    { label: 'Threats', value: sysStats.threats_detected || 0, color: 'text-amber-500' },
+                    { label: 'Quantum %', value: sysStats.keys_generated ? Math.round((sysStats.quantum_source / sysStats.keys_generated) * 100) + '%' : '0%', color: 'text-emerald-400' },
+                  ].map((stat, i) => (
+                    <div key={i} className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col gap-1">
+                      <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest">{stat.label}</span>
+                      <span className={`text-lg font-black tracking-tighter ${stat.color}`}>{stat.value}</span>
+                    </div>
+                  ))}
                 </div>
                 <div className="rounded-[2rem] overflow-hidden border border-white/5 bg-white/[0.01] backdrop-blur-3xl">
                   <div className="overflow-x-auto no-scrollbar">
@@ -1508,14 +1613,14 @@ export default function AdminDashboard() {
       )}
       {/* ── Image Lightbox ── */}
       {previewImage && (
-          <div className="fixed inset-0 bg-black/95 z-[2000] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setPreviewImage(null)}>
-              <button className="absolute top-8 right-8 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white border-none cursor-pointer">
-                  <X size={24} />
-              </button>
-              <img src={previewImage} alt="preview" className="max-w-full max-h-full object-contain shadow-2xl rounded-sm animate-in zoom-in-95" onClick={e => e.stopPropagation()} />
-          </div>
+        <div className="fixed inset-0 bg-black/95 z-[2000] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setPreviewImage(null)}>
+          <button className="absolute top-8 right-8 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white border-none cursor-pointer">
+            <X size={24} />
+          </button>
+          <img src={previewImage} alt="preview" className="max-w-full max-h-full object-contain shadow-2xl rounded-sm animate-in zoom-in-95" onClick={e => e.stopPropagation()} />
+        </div>
       )}
-<style>{`
+      <style>{`
   .custom-scrollbar::-webkit-scrollbar {
     width: 4px;
   }
