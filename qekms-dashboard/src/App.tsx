@@ -11,6 +11,9 @@ import AuditLogsDashboard from './pages/AuditLogsDashboard';
 import ForgotPassword from './pages/ForgotPassword';
 import UpgradePage from './pages/UpgradePage';
 import CompleteProfile from './pages/CompleteProfile';
+import RequestExpert from './pages/RequestExpert';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { user, loading } = useAuth();
@@ -42,6 +45,9 @@ const App = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/status" element={<ClientStatus />} />
+        <Route path="/request-expert" element={<RequestExpert />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/complete-profile" element={
           <ProtectedRoute>

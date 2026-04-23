@@ -11,7 +11,7 @@ from src.models.AdminModel import AdminModel
 from src.models.ChannelModel import ChannelModel
 from src.models.ClientRequestModel import ClientRequestModel
 from src.models.SettingsModel import SettingsModel, PLAN_LIMITS, DEFAULT_PLAN, CLIENT_PLANS, PLAN_DURATION_DAYS
-from src.models.ModelsSchemas.ClientRequestSchema import MarkPaymentRequest, RejectRequestBody
+from src.models.ModelsSchemas.ClientRequestSchema import RejectRequestBody
 from src.services.AuditService import AuditService
 
 logger = logging.getLogger(__name__)
@@ -336,37 +336,6 @@ async def admin_client_stats():
     }
 
 
-@admin_router.put("/clients/{request_id}/payment", dependencies=[Depends(require_admin)])
-async def admin_mark_payment(request_id: str, data: MarkPaymentRequest):
-    """
-    Mark a client request as payment-verified.
-    Must be done before approving the request.
-    """
-    req = await ClientRequestModel.get_by_id(request_id)
-    if not req:
-        raise HTTPException(status_code=404, detail="Client request not found")
-
-    if req.get("status") == "approved":
-        raise HTTPException(
-            status_code=400,
-            detail="Request is already approved and account created.",
-        )
-    if req.get("status") == "rejected":
-        raise HTTPException(status_code=400, detail="Cannot update a rejected request.")
-
-    updated = await ClientRequestModel.update(request_id, {
-        "payment_status": "paid",
-        "payment_reference": data.payment_reference.strip(),
-        "amount": data.amount,
-    })
-    if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update payment status")
-
-    return {
-        "message": "Payment verified successfully.",
-        "payment_reference": data.payment_reference,
-        "amount": data.amount,
-    }
 
 
 @admin_router.put("/clients/{request_id}/approve")
@@ -392,11 +361,6 @@ async def admin_approve_client(request_id: str, request: Request, admin=Depends(
         raise HTTPException(status_code=400, detail="Request already approved.")
     if req.get("status") == "rejected":
         raise HTTPException(status_code=400, detail="Cannot approve a rejected request.")
-    if req.get("payment_status") != "paid":
-        raise HTTPException(
-            status_code=400,
-            detail="Payment must be verified before approval. Use PUT /admin/clients/{id}/payment first.",
-        )
 
     # Check account doesn't already exist
     existing = await AccountModel.get_by_email(req["email"])
@@ -430,9 +394,9 @@ async def admin_approve_client(request_id: str, request: Request, admin=Depends(
         "subscription_status": "active",
         "subscription_start": now,
         "subscription_end": now + timedelta(days=duration),
-        "payment_status": "paid",
-        "payment_reference": req.get("payment_reference", ""),
-        "amount": req.get("amount"),
+        "payment_status": "trial",
+        "payment_reference": "complimentary",
+        "amount": 0,
         "last_modification": now,
     }
 

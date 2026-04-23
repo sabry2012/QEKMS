@@ -25,6 +25,10 @@ logger = logging.getLogger(__name__)
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
+class OtpVerifyRequest(BaseModel):
+    phone_number: str
+    otp_code: str
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -46,10 +50,6 @@ class RegisterRequest(BaseModel):
     full_name: str = "New User"
     phone_number: str
     otp_code: str
-    card_holder: str
-    card_number: str
-    card_expiry: str
-    card_cvv: str
     plan: str = DEFAULT_PLAN
 
     class Config:
@@ -290,18 +290,18 @@ class OtpRequest(BaseModel):
 
 @auth_router.post("/verify-otp")
 async def verify_otp(data: OtpVerifyRequest):
-    phone = data.phone_number.replace(" ", "")
-    if not phone.startsWith("+"):
+    phone = data.phone_number.strip().replace(" ", "")
+    if not phone.startswith("+"):       
         phone = "+" + phone
     
-    otp_record = await PhoneOtpModel.verify(phone, data.otp_code)
-    if not otp_record:
+    verified = await PhoneOtpModel.verify_otp(phone, data.otp_code, delete_after=False)
+    if not verified:
         raise HTTPException(status_code=400, detail="Invalid or expired OTP code.")
     
     return {"status": "success", "message": "OTP verified."}
 
 class CompleteProfileRequest(BaseModel):
-    phone_number: str
+    phone_number: str   
     otp_code: str
     card_holder: str
     card_number: str
@@ -309,13 +309,13 @@ class CompleteProfileRequest(BaseModel):
     card_cvv: str
 
 
-class OtpVerifyRequest(BaseModel):
-    phone_number: str
-    otp_code: str
 
 @auth_router.post("/request-otp")
 async def request_otp(data: OtpRequest):
-    phone = data.phone_number.strip()
+    phone = data.phone_number.strip().replace(" ", "")
+    if not phone.startswith("+"):
+        phone = "+" + phone
+
     # Check if phone is already in use by another account
     existing = await AccountModel.get_by_phone(phone)
     if existing:
@@ -336,12 +336,12 @@ async def complete_profile(
     phone = reg_data.phone_number.strip()
     otp_code = reg_data.otp_code.strip()
     
-    # 1. Verify OTP
-    verified = await PhoneOtpModel.verify_otp(phone, otp_code)
+    # 1. Verify OTP (and delete it this time)
+    verified = await PhoneOtpModel.verify_otp(phone, otp_code, delete_after=True)
     if not verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired verification code."
+            detail="The verification code has expired or is invalid. Please request a new one."
         )
     
     # 2. Check if phone is already taken (double check)
@@ -353,13 +353,7 @@ async def complete_profile(
         )
     
     updated = await AccountModel.update(user_id, {
-        "phone_number": phone,
-        "card_info": {
-            "holder": reg_data.card_holder,
-            "last4": reg_data.card_number[-4:] if len(reg_data.card_number) >= 4 else "****",
-            "expiry": reg_data.card_expiry
-            # In a real app, don't store full card data here without PCI compliance
-        }
+        "phone_number": phone
     })
     if not updated:
         raise HTTPException(status_code=404, detail="User not found")
@@ -388,12 +382,12 @@ async def register(request: Request, reg_data: RegisterRequest):
         phone = reg_data.phone_number.strip()
         otp_code = reg_data.otp_code.strip()
 
-        # 1. Verify OTP
-        verified = await PhoneOtpModel.verify_otp(phone, otp_code)
+        # 1. Verify OTP (Final consumption)
+        verified = await PhoneOtpModel.verify_otp(phone, otp_code, delete_after=True)
         if not verified:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired verification code."
+                detail="Security validation failed: Verification code is invalid or has expired."
             )
 
         existing_phone = await AccountModel.get_by_phone(phone)
@@ -407,20 +401,6 @@ async def register(request: Request, reg_data: RegisterRequest):
         now = datetime.utcnow()
         duration = PLAN_DURATION_DAYS.get(plan, PLAN_DURATION_DAYS[DEFAULT_PLAN])
         limits = PLAN_LIMITS[plan]
-
-        # 3. Create Account with financial data
-        user_id = await AccountModel.create(
-            email=reg_data.email,
-            password=get_password_hash(reg_data.password),
-            full_name=reg_data.full_name,
-            phone_number=phone,
-            plan=reg_data.plan,
-            card_info={
-                "holder": reg_data.card_holder,
-                "last4": reg_data.card_number[-4:] if len(reg_data.card_number) >= 4 else "****",
-                "expiry": reg_data.card_expiry
-            }
-        )
 
         user_data = {
             "email": email,
@@ -436,7 +416,7 @@ async def register(request: Request, reg_data: RegisterRequest):
             "subscription_status": "active",
             "subscription_start": now,
             "subscription_end": now + timedelta(days=duration),
-            "payment_status": "trial" if plan == "free" else "pending",
+            "payment_status": "trial",
             "last_modification": now,
         }
 

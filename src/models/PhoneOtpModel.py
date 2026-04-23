@@ -34,13 +34,14 @@ class PhoneOtpModel:
         return code
 
     @classmethod
-    async def verify_otp(cls, phone: str, code: str) -> bool:
-        """Verify the OTP and delete it if correct."""
+    async def verify_otp(cls, phone: str, code: str, delete_after: bool = True) -> bool:
+        """Verify the OTP and optionally delete it."""
         db = get_db()
         otp_doc = await db[cls.collection_name].find_one({"phone": phone, "code": code})
         
         if otp_doc:
-            # Delete after successful verification
-            await db[cls.collection_name].delete_one({"_id": otp_doc["_id"]})
+            if delete_after:
+                # Delete after successful verification
+                await db[cls.collection_name].delete_one({"_id": otp_doc["_id"]})
             return True
         return False

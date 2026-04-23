@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Shield, Zap, Globe, Cpu, Check, ArrowRight, X, Lock, CreditCard } from 'lucide-react';
+import { Shield, Zap, Globe, Cpu, Check, ArrowRight, X, Lock } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 
@@ -8,8 +8,8 @@ const UpgradePage = () => {
     const plans = [
         {
             name: 'Starter',
-            price: '$29',
-            duration: 'per month',
+            price: 'Open',
+            duration: 'Standard Node',
             features: [
                 'Up to 10 Channels',
                 '100 Encryptions / month',
@@ -27,8 +27,8 @@ const UpgradePage = () => {
         },
         {
             name: 'Professional',
-            price: '$49',
-            duration: 'per month',
+            price: 'Complimentary',
+            duration: 'Enterprise Node',
             popular: true,
             features: [
                 'Up to 50 Channels',
@@ -48,8 +48,8 @@ const UpgradePage = () => {
         },
         {
             name: 'Enterprise',
-            price: 'Custom',
-            duration: 'Contact Sales',
+            price: 'Provisioned',
+            duration: 'Infrastructure Scale',
             features: [
                 'Unlimited Channels',
                 'Unlimited Encryptions',
@@ -163,15 +163,14 @@ const UpgradePage = () => {
                     ))}
                 </div>
 
-                {/* Footer Section */}
                 <div className="mt-24 p-12 rounded-[40px] border border-white/5 bg-white/[0.01] backdrop-blur-md flex flex-col md:flex-row items-center justify-between gap-8">
                     <div className="flex items-center gap-6">
                         <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center text-gray-400">
-                            <CreditCard size={32} />
+                            <Globe size={32} />
                         </div>
                         <div>
-                            <h4 className="text-xl font-black text-white uppercase tracking-tight mb-1">Corporate Billing</h4>
-                            <p className="text-gray-500 text-xs font-bold uppercase tracking-widest">Need custom invoicing or wire transfers? Our accounts team is ready.</p>
+                            <h4 className="text-xl font-black text-white uppercase tracking-tight mb-1">Global Expansion</h4>
+                            <p className="text-gray-500 text-xs font-bold uppercase tracking-widest">Looking for custom mesh deployments or localized node hosting?</p>
                         </div>
                     </div>
                     <button className="px-10 py-5 rounded-2xl border border-white/10 hover:border-white/30 text-white font-black uppercase tracking-widest text-[11px] transition-all flex items-center gap-3">

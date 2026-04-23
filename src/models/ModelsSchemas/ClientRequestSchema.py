@@ -11,12 +11,6 @@ class ClientRequestCreate(BaseModel):
     phone: str
     plan: str          # "pro" or "enterprise"
     notes: Optional[str] = None
-    
-    # Financial fields for administrative review
-    card_holder: str
-    card_number: str
-    card_expiry: str
-    card_cvv: str
 
 
 class ClientRequestOut(BaseModel):
@@ -29,12 +23,6 @@ class ClientRequestOut(BaseModel):
     status: str
     payment_status: str
     created_at: datetime
-
-
-class MarkPaymentRequest(BaseModel):
-    """Body for admin to record payment verification."""
-    payment_reference: str
-    amount: float
 
 
 class RejectRequestBody(BaseModel):

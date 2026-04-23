@@ -4,8 +4,8 @@ import {
 } from 'recharts';
 import {
   Users, Shield, Activity, Settings, UserPlus, Radio, RefreshCw, Trash2, CheckCircle2,
-  XCircle, LogOut, DollarSign, Plus, Globe, ToggleLeft, ToggleRight, AlertTriangle, Zap,
-  Cpu, Lock, Fingerprint, Database, Terminal, CreditCard, ChevronRight, MessageSquare, Send, UserCircle, Search,
+  XCircle, LogOut, Plus, Globe, ToggleLeft, ToggleRight, AlertTriangle, Zap,
+  Cpu, Lock, Fingerprint, Database, Terminal, ChevronRight, MessageSquare, Send, UserCircle, Search,
   Paperclip, Mic, StopCircle, FileText, X, Download, Play, SendHorizonal, PlayCircle, PauseCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -247,9 +247,7 @@ export default function AdminDashboard() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newUser, setNewUser] = useState({ email: '', password: '', role: 'account', plan: 'professional' });
 
-  // Payment/Provisioning State
-  const [verifyingClient, setVerifyingClient] = useState<ClientRequest | null>(null);
-  const [paymentForm, setPaymentForm] = useState({ reference: '', amount: 0 });
+  // Provisioning State
   const [credsResult, setCredsResult] = useState<{ email: string; password: string } | null>(null);
   const [resetUser, setResetUser] = useState<any | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -369,16 +367,6 @@ export default function AdminDashboard() {
     setNewUser({ email: '', password: '', role: 'account', plan: 'pro' });
   };
 
-  const handleVerifyPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!verifyingClient) return;
-    await handleAction(`/admin/clients/${verifyingClient.id}/payment`, 'put', {
-      payment_reference: paymentForm.reference,
-      amount: paymentForm.amount
-    });
-    setVerifyingClient(null);
-    setPaymentForm({ reference: '', amount: 0 });
-  };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -607,7 +595,7 @@ export default function AdminDashboard() {
     { label: 'Total Nodes', value: stats.total_users, icon: Users, color: 'text-primary-cyan', bg: 'bg-primary-cyan/15', border: 'border-primary-cyan/25' },
     { label: 'Pending Requests', value: stats.pending_requests, icon: Activity, color: 'text-amber-500', bg: 'bg-amber-500/15', border: 'border-amber-500/25' },
     { label: 'Security Threats', value: sysStats.threats_detected || 0, icon: Shield, color: 'text-red-500', bg: 'bg-red-500/15', border: 'border-red-500/25' },
-    { label: 'Revenue', value: `$${totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'text-violet-500', bg: 'bg-violet-500/15', border: 'border-violet-500/25' },
+    { label: 'Active Channels', value: channels.length, icon: Radio, color: 'text-violet-500', bg: 'bg-violet-500/15', border: 'border-violet-500/25' },
   ];
 
   const tabs = [
@@ -1219,7 +1207,7 @@ export default function AdminDashboard() {
                   {filteredClientsList.map(client => (
                     <Card key={client.id} className="p-6 flex flex-col gap-6 border-white/5 bg-white/[0.03] relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-20 transition-opacity">
-                        <CreditCard size={60} className="text-primary-cyan" />
+                        <UserCircle size={60} className="text-primary-cyan" />
                       </div>
 
                       <div className="flex justify-between items-start relative z-10">
@@ -1247,48 +1235,16 @@ export default function AdminDashboard() {
                       <div className="flex gap-2 flex-wrap pb-2 border-b border-white/5 relative z-10">
                         <span className="text-[10px] text-primary-cyan bg-primary-cyan/10 px-3 py-1 rounded-lg font-black uppercase tracking-wider">{client.plan}</span>
                         <span className="text-[10px] text-gray-500 bg-white/5 px-3 py-1 rounded-lg font-mono">{client.email}</span>
-                        {client.payment_status === 'paid' && (
-                          <span className="text-[10px] text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-lg font-black uppercase tracking-wider flex items-center gap-1.5">
-                            <CheckCircle2 size={12} /> PAID
-                          </span>
-                        )}
-                        {(client as any).card_number && (
-                           <span className="text-[10px] text-amber-500 bg-amber-500/10 px-3 py-1 rounded-lg font-bold tracking-widest flex items-center gap-1.5">
-                             <CreditCard size={12} /> {(client as any).card_number.slice(-4)}
-                           </span>
-                        )}
                       </div>
-
-                      {client.payment_status === 'paid' && client.payment_reference && (
-                        <div className="px-4 py-3 rounded-[1.25rem] bg-white/5 border border-white/5 space-y-2 animate-in slide-in-from-top-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[9px] text-gray-500 uppercase font-black tracking-widest">Transaction ID</span>
-                            <span className="text-[12px] text-emerald-400 font-black tracking-tighter">${client.amount?.toLocaleString()}</span>
-                          </div>
-                          <p className="m-0 text-[13px] text-white font-mono truncate bg-black/20 p-2 rounded-lg">{client.payment_reference}</p>
-                        </div>
-                      )}
 
                       {client.status === 'pending' && (
                         <div className="flex flex-col gap-3 mt-auto relative z-10">
-                          {client.payment_status !== 'paid' ? (
-                            <button
-                              onClick={() => {
-                                setVerifyingClient(client);
-                                setPaymentForm({ reference: '', amount: client.plan === 'enterprise' ? 2500 : 500 });
-                              }}
-                              className="w-full py-4 rounded-2xl border-none cursor-pointer bg-primary-cyan text-black font-black text-[13px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-white transition-all shadow-mesh-glow"
-                            >
-                              <CreditCard size={18} /> Verify Payment
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleAction(`/admin/clients/${client.id}/approve`, 'put')}
-                              className="w-full py-4 rounded-2xl border-none cursor-pointer bg-mesh-gradient text-white font-black text-[13px] uppercase tracking-widest flex items-center justify-center gap-3 hover:opacity-90 transition-all shadow-mesh-glow"
-                            >
-                              <CheckCircle2 size={18} /> Provision Access
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleAction(`/admin/clients/${client.id}/approve`, 'put')}
+                            className="w-full py-4 rounded-2xl border-none cursor-pointer bg-mesh-gradient text-white font-black text-[13px] uppercase tracking-widest flex items-center justify-center gap-3 hover:opacity-90 transition-all shadow-mesh-glow"
+                          >
+                            <CheckCircle2 size={18} /> Provision Access
+                          </button>
                           <button
                             onClick={() => handleAction(`/admin/clients/${client.id}/reject`, 'put')}
                             className="w-full py-3 rounded-2xl border border-white/10 bg-transparent text-gray-600 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-500/10 hover:text-red-500 transition-all"
@@ -1422,75 +1378,6 @@ export default function AdminDashboard() {
         </p>
       </div>
 
-      {/* ── Client Modals ── */}
-      {verifyingClient && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <Card className="w-full max-w-md p-10 border-primary-cyan/30 bg-mesh-dark shadow-2xl animate-in zoom-in-95 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-mesh-gradient" />
-            <div className="flex items-center gap-5 mb-10">
-              <div className="w-14 h-14 rounded-2xl bg-primary-cyan/10 flex items-center justify-center border border-primary-cyan/20">
-                <CreditCard size={28} className="text-primary-cyan" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-black text-white m-0 tracking-tight">Mesh Verification</h3>
-                <p className="text-[9px] text-gray-500 mt-1 uppercase tracking-widest font-black">Node: <span className="text-primary-cyan">{verifyingClient.full_name}</span></p>
-              </div>
-            </div>
-
-            {/* Financial Profile Card */}
-            {(verifyingClient as any).card_number && (
-                <div className="mb-8 p-6 rounded-3xl bg-gradient-to-br from-zinc-800 to-black border border-white/10 shadow-2xl relative overflow-hidden group">
-                   <div className="absolute top-[-20px] right-[-20px] w-32 h-32 bg-primary-cyan/5 rounded-full blur-3xl opacity-50" />
-                   <div className="flex justify-between items-start mb-10">
-                       <Radio size={20} className="text-primary-cyan opacity-40" />
-                       <div className="text-[10px] font-black text-gray-500 tracking-[0.2em] uppercase">Quantum Wallet</div>
-                   </div>
-                   
-                   <p className="text-2xl font-bold text-white tracking-[0.15em] mb-8 font-mono">
-                      {(verifyingClient as any).card_number}
-                   </p>
-                   
-                   <div className="flex justify-between items-end">
-                       <div className="space-y-1">
-                           <p className="text-[8px] font-black text-gray-600 uppercase tracking-widest">Card Holder</p>
-                           <p className="text-[13px] font-bold text-white uppercase tracking-tight">{(verifyingClient as any).card_holder}</p>
-                       </div>
-                       <div className="flex gap-6">
-                           <div className="space-y-1 text-right">
-                               <p className="text-[8px] font-black text-gray-600 uppercase tracking-widest">Expires</p>
-                               <p className="text-[13px] font-bold text-white uppercase tracking-tight">{(verifyingClient as any).card_expiry}</p>
-                           </div>
-                           <div className="space-y-1 text-right">
-                               <p className="text-[8px] font-black text-gray-600 uppercase tracking-widest">CVV</p>
-                               <p className="text-[13px] font-bold text-primary-cyan uppercase tracking-tight">{(verifyingClient as any).card_cvv}</p>
-                           </div>
-                       </div>
-                   </div>
-                </div>
-            )}
-
-            <form onSubmit={handleVerifyPayment} className="space-y-6">
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Txn Identifier</label>
-                  <Input required placeholder="STRIPE_CH_XXXXXX" value={paymentForm.reference} onChange={e => setPaymentForm({ ...paymentForm, reference: e.target.value })} className="h-14 font-mono text-sm bg-black/40" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Verification Value (USD)</label>
-                  <div className="relative">
-                    <DollarSign size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-cyan" />
-                    <Input type="number" required value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: +e.target.value })} className="h-14 pl-12 font-black text-lg bg-black/40" />
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-4 pt-2">
-                <Button type="submit" className="flex-1 h-14 shadow-mesh-glow font-black text-[11px] uppercase tracking-widest">Commit Handshake</Button>
-                <Button variant="secondary" type="button" onClick={() => setVerifyingClient(null)} className="flex-1 h-14 font-black text-[11px] uppercase tracking-widest">Abort</Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
 
       {/* ── Shared Credential View ── */}
       {credsResult && (

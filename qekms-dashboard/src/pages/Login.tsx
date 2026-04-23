@@ -79,42 +79,64 @@ export default function Login() {
 
   return (
     <div className="h-screen w-full flex items-center justify-center bg-mesh-dark font-sans text-white relative overflow-hidden">
-      {/* Ambient */}
+      {/* Ambient backgrounds */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-primary-cyan/5 blur-[120px]" />
         <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-violet-500/5 blur-[120px]" />
       </div>
 
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6 h-full flex flex-col lg:flex-row gap-12 lg:gap-32 items-center justify-center">
-        {/* ── Left: Main Login Card ── */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+        {/* Left Side: Brand Identity */}
+        <div className="hidden lg:block max-w-xl shrink-0">
+          <div className="mb-8 flex items-center gap-4">
+             <div className="w-12 h-12 bg-primary-cyan/10 border border-primary-cyan/20 rounded-2xl flex items-center justify-center">
+                <Shield className="text-primary-cyan" size={24} />
+             </div>
+             <p className="text-[10px] font-black tracking-[0.4em] text-primary-cyan uppercase opacity-80">Enterprise Protocol</p>
+          </div>
+          <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] m-0 mb-8">
+            <span className="text-white block">Quantum Access</span>
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-500 drop-shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+              Authentication.
+            </span>
+          </h1>
+          <p className="text-gray-500 text-lg font-medium leading-relaxed max-w-md">
+            Unlock your secure node and rejoin the quantum mesh. All connections are encrypted and audited in real-time.
+          </p>
+        </div>
+
+        {/* ── Login-Synced Form Card ── */}
+        <motion.div 
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
           className="w-full max-w-xl bg-[#0d0d0f]/80 border border-white/10 rounded-[2.5rem] p-8 md:p-10 backdrop-blur-2xl shadow-2xl relative overflow-hidden group"
         >
           <div className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-primary-cyan/5 rounded-full blur-[80px]" />
           
-          <div className="mb-8 text-left">
-            <p className="text-[9px] font-black tracking-[0.4em] text-primary-cyan mb-2 uppercase opacity-80">Security Protocol</p>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tighter leading-[0.95] m-0">
+          {/* Mobile Header */}
+          <div className="mb-10 text-left lg:hidden">
+            <p className="text-[9px] font-black tracking-[0.4em] text-primary-cyan mb-2 uppercase opacity-80">Enterprise Protocol</p>
+            <h1 className="text-4xl font-black tracking-tighter leading-[0.95] m-0">
               <span className="text-white block">Quantum Access</span>
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-500 drop-shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-                Authentication.
-              </span>
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-500">Authentication.</span>
             </h1>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Split Roles Grid */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="mb-8 hidden lg:block">
+               <h3 className="text-2xl font-black tracking-tighter mb-1 text-white">Secure Node Login</h3>
+               <p className="text-gray-500 text-[10px] uppercase tracking-[0.2em] font-bold">Authorized Personnel Only</p>
+            </div>
+
+            {/* Role Selection */}
+            <div className="grid grid-cols-2 gap-4 mb-8">
               <button
                 type="button"
                 onClick={() => setRole('admin')}
                 className={`p-4 rounded-2xl transition-all duration-300 border flex flex-col items-center justify-center gap-2 ${role === 'admin'
                   ? 'border-primary-cyan/40 bg-primary-cyan/10 shadow-mesh-glow'
                   : 'border-white/5 bg-white/[0.03] hover:bg-white/[0.05]'
-                  }`}
+                }`}
               >
                 <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${role === 'admin' ? 'text-primary-cyan' : 'text-gray-500'}`}>Overseer</span>
                 {role === 'admin' && <div className="w-1 h-1 rounded-full bg-primary-cyan shadow-[0_0_8px_cyan]" />}
@@ -125,15 +147,14 @@ export default function Login() {
                 className={`p-4 rounded-2xl transition-all duration-300 border flex flex-col items-center justify-center gap-2 ${role === 'account'
                   ? 'border-primary-cyan/40 bg-primary-cyan/10 shadow-mesh-glow'
                   : 'border-white/5 bg-white/[0.03] hover:bg-white/[0.05]'
-                  }`}
+                }`}
               >
                 <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${role === 'account' ? 'text-primary-cyan' : 'text-gray-500'}`}>Operator</span>
                 {role === 'account' && <div className="w-1 h-1 rounded-full bg-primary-cyan shadow-[0_0_8px_cyan]" />}
               </button>
             </div>
 
-            {/* Inputs Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Identity Secret</label>
                 <div className="relative group">
@@ -142,19 +163,17 @@ export default function Login() {
                     type="email"
                     required
                     className="w-full h-14 bg-white/[0.02] border border-white/10 rounded-2xl pl-12 pr-4 text-sm outline-none transition-all focus:border-primary-cyan/40 focus:bg-white/5"
-                    placeholder="operator@mesh.intel"
+                    placeholder="email@quantum.node"
                     value={email}
-                    onChange={e => setEmail(e.target.value)}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between ml-1">
+                <div className="flex justify-between items-center px-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Access Cipher</label>
-                  <Link to="/forgot-password" className="text-[10px] font-bold text-primary-cyan hover:underline transition-all">
-                    Forgot?
-                  </Link>
+                  <Link to="/forgot-password/request" className="text-[9px] font-bold text-primary-cyan/60 hover:text-primary-cyan uppercase tracking-widest transition-colors">Recover</Link>
                 </div>
                 <div className="relative group">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-primary-cyan transition-colors" size={18} />
@@ -177,91 +196,30 @@ export default function Login() {
               </div>
             </div>
 
-            <AnimatePresence mode="wait">
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0, y: -10 }}
-                  animate={{ opacity: 1, height: 'auto', y: 0 }}
-                  exit={{ opacity: 0, height: 0, y: -10 }}
-                  className="p-3 rounded-xl bg-red-500/5 border border-red-500/10 text-red-500 text-[10px] font-bold"
-                >
-                  {error}
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {error && (
+              <div className="p-4 rounded-xl text-[10px] text-red-500 bg-red-500/5 border border-red-500/10 font-black uppercase tracking-widest text-center">
+                {error}
+              </div>
+            )}
 
-            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-              <Button
-                type="submit"
-                className="w-full h-14 text-[12px] font-black uppercase tracking-[0.2em] shadow-mesh-glow shadow-primary-cyan/10"
+            <div className="flex flex-col gap-4">
+              <Button 
+                type="submit" 
+                className="w-full h-14 bg-mesh-gradient shadow-mesh-glow font-black text-xs uppercase tracking-[0.2em] rounded-2xl" 
                 isLoading={submitting}
               >
-                Establish Connection <ArrowRight size={18} className="ml-2" />
+                Access Node <ArrowRight size={18} className="ml-2" />
               </Button>
-            </motion.div>
 
-            {/* Google Divider */}
-            <div className="relative py-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-white/5"></div>
-              </div>
-              <div className="relative flex justify-center text-[9px] font-black uppercase tracking-[0.3em] text-gray-600">
-                <span className="bg-mesh-dark px-4">Federated Access</span>
-              </div>
-            </div>
-
-            <GoogleAuthButton id="google-signin-button" text="Fast-Track Identity" />
-
-            <div className="flex justify-center items-center gap-6 pt-2">
-              <Link to="/register" className="text-[11px] font-bold text-gray-600 hover:text-white transition-colors">Apply Clearance</Link>
-              <div className="w-1 h-1 rounded-full bg-white/10" />
-              <Link to="/status" className="text-[11px] font-bold text-gray-600 hover:text-white transition-colors">Audit Status</Link>
+              <div id="google-signin-button" className="flex justify-center" />
+              
+              <p className="text-center text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-4">
+                New Node? <Link to="/register" className="text-primary-cyan hover:underline transition-all">Provision Now</Link>
+              </p>
             </div>
           </form>
         </motion.div>
 
-        {/* ── Right: Side Info Panel (Protocol Pipeline) ── */}
-        <div className="hidden lg:flex flex-col gap-8 max-w-sm shrink-0 h-full justify-center">
-            <div className="space-y-2">
-                <p className="text-[10px] font-black text-primary-cyan uppercase tracking-[0.4em] opacity-80">Authentication Loop</p>
-                <h3 className="text-2xl font-black text-white tracking-tighter">Protocol Pipeline</h3>
-            </div>
-            
-            <div className="space-y-8">
-              {[
-                { step: '01', title: 'Credential Audit', desc: 'Secure verification of identity matrix and node clearance levels.' },
-                { step: '02', title: 'Handshake Sync', desc: 'Quantum key exchange and multi-factor protocol initialization.' },
-                { step: '03', title: 'Access Granted', desc: 'Encrypted tunnel establishment to high-availability compute nodes.' },
-              ].map(s => (
-                <div key={s.step} className="flex gap-6 group">
-                  <span className="text-[10px] font-black text-gray-500 shrink-0 border border-white/10 w-10 h-10 flex items-center justify-center rounded-xl group-hover:border-primary-cyan/40 group-hover:text-primary-cyan transition-all duration-300">
-                    {s.step}
-                  </span>
-                  <div>
-                    <p className="text-sm font-black text-white mb-1 group-hover:text-primary-cyan transition-colors">{s.title}</p>
-                    <p className="text-[10px] text-gray-500 leading-relaxed font-medium uppercase tracking-wider">{s.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <div className="mt-8 pt-8 border-t border-white/5 space-y-6">
-               <div className="flex items-center gap-4 group">
-                  <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-all">
-                    <Shield size={14} className="text-emerald-500" />
-                  </div>
-                  <span className="text-[10px] font-black text-white/60 tracking-[0.2em] uppercase">ISO-27001 SECURE NODE</span>
-               </div>
-               <p className="text-[10px] text-gray-600 font-bold uppercase leading-loose tracking-widest italic opacity-50">
-                    Quantum Governance v4.2 Active
-               </p>
-            </div>
-        </div>
-      </div>
-
-      {/* ── Footer Decorative Audit Info ── */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 hidden md:flex items-center gap-4 opacity-30 pointer-events-none">
-        <span className="text-[9px] font-black text-gray-500 uppercase tracking-[0.5em]"></span>
       </div>
     </div>
   );

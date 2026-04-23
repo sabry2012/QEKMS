@@ -12,32 +12,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function CompleteProfile() {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
-  const [card, setCard] = useState({
-    holder: '',
-    number: '',
-    expiry: '',
-    cvv: ''
-  });
-  const [step, setStep] = useState(1); // 1: Phone, 2: OTP, 3: Payment
+  const [step, setStep] = useState(1); // 1: Phone, 2: OTP
   const [isPhoneValid, setIsPhoneValid] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const navigate = useNavigate();
   const { login } = useAuth();
-
-  const updateCard = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value;
-    if (field === 'number') {
-      value = value.replace(/\D/g, '').substring(0, 16).match(/.{1,4}/g)?.join(' ') || value;
-    }
-    if (field === 'expiry') {
-      value = value.replace(/\D/g, '').substring(0, 4);
-      if (value.length >= 2) value = value.substring(0, 2) + '/' + value.substring(2);
-    }
-    if (field === 'cvv') value = value.replace(/\D/g, '').substring(0, 4);
-    setCard({ ...card, [field]: value });
-  };
 
   const handleSendOtp = async () => {
     setError('');
@@ -70,36 +51,12 @@ export default function CompleteProfile() {
     }
   };
 
-  const handleVerifyOtp = async () => {
-    setError('');
-    if (otp.length !== 6) {
-      setError('Please enter the 6-digit code.');
-      return;
-    }
-    setSubmitting(true);
-    try {
-        await api.post('/auth/verify-otp', { 
-            phone_number: phone, 
-            otp_code: otp 
-        });
-        setStep(3); // Move to Payment only if verified
-    } catch (err: any) {
-        setError(err.response?.data?.detail || 'Invalid OTP code. Access Denied.');
-    } finally {
-        setSubmitting(false);
-    }
-  };
-
   const handleFinalSubmit = async () => {
     setSubmitting(true);
     try {
-      await api.patch('/auth/complete-profile', { 
+      await api.patch('/auth/complete-profile', {
         phone_number: phone,
-        otp_code: otp,
-        card_holder: card.holder,
-        card_number: card.number.replace(/\s/g, ''),
-        card_expiry: card.expiry,
-        card_cvv: card.cvv
+        otp_code: otp
       });
       await login(); // Refresh user data
       navigate('/dashboard');
@@ -114,13 +71,9 @@ export default function CompleteProfile() {
     e.preventDefault();
     if (step === 1) {
       handleSendOtp();
-      return;
+    } else {
+      handleFinalSubmit();
     }
-    if (step === 2) {
-      handleVerifyOtp();
-      return;
-    }
-    handleFinalSubmit();
   };
 
   return (
@@ -131,7 +84,7 @@ export default function CompleteProfile() {
         <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-violet-500/5 blur-[120px]" />
       </div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         className="relative z-10 w-full max-w-md p-8 md:p-10 bg-[#0d0d0f]/80 border border-white/10 rounded-[2.5rem] backdrop-blur-2xl shadow-2xl"
@@ -150,7 +103,7 @@ export default function CompleteProfile() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <AnimatePresence mode="wait">
-            {step === 1 && (
+            {step === 1 ? (
               <motion.div key="p1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="phone-input-wrapper">
                 <PhoneInput
                   country={'eg'}
@@ -164,8 +117,7 @@ export default function CompleteProfile() {
                   autoFormat={true}
                 />
               </motion.div>
-            )}
-            {step === 2 && (
+            ) : (
               <motion.div key="p2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
                 <div className="relative">
                   <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-cyan/40" size={18} />
@@ -186,21 +138,6 @@ export default function CompleteProfile() {
                 </div>
               </motion.div>
             )}
-            {step === 3 && (
-              <motion.div key="p3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-                <div className="text-center mb-4">
-                  <p className="text-[10px] font-black text-primary-cyan uppercase tracking-widest">Financial Handshake</p>
-                </div>
-                <div className="space-y-3">
-                  <input type="text" placeholder="CARD HOLDER" value={card.holder} onChange={updateCard('holder')} className="w-full h-12 bg-white/[0.02] border border-white/10 rounded-xl px-4 text-xs outline-none focus:border-primary-cyan/40" />
-                  <input type="text" placeholder="0000 0000 0000 0000" value={card.number} onChange={updateCard('number')} className="w-full h-12 bg-white/[0.02] border border-white/10 rounded-xl px-4 text-xs font-mono outline-none focus:border-primary-cyan/40" />
-                  <div className="grid grid-cols-2 gap-3">
-                    <input type="text" placeholder="MM/YY" value={card.expiry} onChange={updateCard('expiry')} className="h-12 bg-white/[0.02] border border-white/10 rounded-xl px-4 text-xs text-center outline-none focus:border-primary-cyan/40" />
-                    <input type="password" placeholder="CVV" value={card.cvv} onChange={updateCard('cvv')} className="h-12 bg-white/[0.02] border border-white/10 rounded-xl px-4 text-xs text-center outline-none focus:border-primary-cyan/40" />
-                  </div>
-                </div>
-              </motion.div>
-            )}
           </AnimatePresence>
 
           {error && (
@@ -209,12 +146,12 @@ export default function CompleteProfile() {
             </div>
           )}
 
-          <Button 
-            type="submit" 
-            className="w-full h-14 bg-mesh-gradient shadow-mesh-glow font-black text-xs uppercase tracking-[0.2em] rounded-2xl" 
+          <Button
+            type="submit"
+            className="w-full h-14 bg-mesh-gradient shadow-mesh-glow font-black text-xs uppercase tracking-[0.2em] rounded-2xl"
             isLoading={submitting}
           >
-            {step === 1 ? 'Send Verification Code' : step === 2 ? 'Verify Code' : 'Establish Connection'} <ArrowRight size={18} className="ml-2" />
+            {step === 1 ? 'Send Verification Code' : 'Establish Connection'} <ArrowRight size={18} className="ml-2" />
           </Button>
         </form>
 

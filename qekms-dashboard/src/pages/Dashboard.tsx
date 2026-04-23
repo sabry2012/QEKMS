@@ -934,16 +934,16 @@ export default function Dashboard() {
                     <div className="pt-4 space-y-6 text-center">
                         <div className="p-6 rounded-3xl bg-amber-500/5 border border-amber-500/10 space-y-3">
                             <AlertTriangle size={32} className="text-amber-500 mx-auto" />
-                            <h4 className="text-lg font-black text-white tracking-tight m-0">Quota Reached</h4>
+                            <h4 className="text-lg font-black text-white tracking-tight m-0">Capacity Reached</h4>
                             <p className="text-xs text-gray-400 leading-relaxed m-0 italic">
-                                Your <span className="text-amber-500 font-bold uppercase">{user?.plan || 'Free'}</span> plan is currently restricted to {currentLimit} mesh nodes. Access to further mappings requires a higher clearance level.
+                                Your current deployment is restricted to {currentLimit} mesh nodes. Access to further mappings requires an expansion of your administrative clearance.
                             </p>
                         </div>
                         <Button 
                             onClick={() => window.location.href = '/upgrade'}
-                            className="w-full h-14 bg-amber-500 text-black hover:bg-white transition-all font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-amber-500/20"
+                            className="w-full h-14 bg-primary-cyan text-black hover:bg-white transition-all font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-primary-cyan/20"
                         >
-                             UPGRADE CLEARANCE
+                             REQUEST EXPANSION
                         </Button>
                         <button onClick={() => setShowCreateChannel(false)} className="text-[10px] font-bold text-gray-600 hover:text-white transition-colors bg-transparent border-none cursor-pointer">
                             DISMISS WARNING

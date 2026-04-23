@@ -26,6 +26,7 @@ from src.routes.channels import channel_router
 from src.routes.admin import admin_router
 from src.routes.client import client_router
 from src.routes.system import system_router
+from src.routes.inquiries import inquiries_router
 
 from src.services.QEKMS_service import QEKMS_service
 from src.services.email_service import EmailService
@@ -171,6 +172,7 @@ app.include_router(account_router)
 app.include_router(channel_router)
 app.include_router(client_router)
 app.include_router(system_router)
+app.include_router(inquiries_router)
 
 # ─────────────────────────────────────────────────────────────
 # Static

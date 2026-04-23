@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import api from '../api/axiosConfig';
-import { Shield, ShieldAlert, Search, CheckCircle2, Clock, XCircle, CreditCard, ArrowLeft, Terminal, ArrowRight } from 'lucide-react';
+import { Shield, ShieldAlert, Search, CheckCircle2, Clock, XCircle, ArrowLeft, Terminal, ArrowRight } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -177,35 +177,13 @@ export default function ClientStatus() {
                   </div>
                 )}
 
-                {statusData.status === 'pending' && statusData.payment_status === 'pending' && (
-                  <div className="space-y-6">
-                    <p className="text-gray-500 text-[11px] font-bold leading-relaxed m-0 border-l-2 border-primary-cyan/20 pl-4">
-                      Capital transmission required to activate the <strong className="text-white uppercase">{statusData.plan}</strong> node tier.
-                    </p>
-
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      <div className="bg-black/30 border border-white/5 p-5 rounded-2xl hover:border-primary-cyan/30 transition-colors group">
-                        <p className="text-[9px] uppercase tracking-[0.2em] font-black text-gray-600 mb-2 group-hover:text-primary-cyan transition-colors">Operational SWIFT Vault</p>
-                        <p className="font-mono text-[13px] font-bold text-white break-all mb-1">CH-8800-QEKMS-BANK-54</p>
-                        <p className="text-[9px] font-bold text-gray-700 uppercase">QEKMS SECURITY HOLDING LLC</p>
-                      </div>
-
-                      <div className="bg-black/30 border border-white/5 p-5 rounded-2xl hover:border-emerald-500/30 transition-colors group">
-                        <p className="text-[9px] uppercase tracking-[0.2em] font-black text-gray-600 mb-2 group-hover:text-emerald-400 transition-colors">USDT (TRC20) Target</p>
-                        <p className="font-mono text-[13px] font-bold text-white break-all mb-1">TEz1c3u9YVb...Xp9Qekms</p>
-                        <p className="text-[9px] font-bold text-gray-700 uppercase tracking-widest">DECENTRALIZED CLEARING</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {statusData.status === 'pending' && statusData.payment_status === 'paid' && (
-                  <div className="p-8 text-center bg-emerald-500/5 border border-emerald-500/10 rounded-3xl">
-                     <div className="w-16 h-16 bg-emerald-500/10 mx-auto rounded-3xl flex items-center justify-center border border-emerald-500/20 mb-6">
-                        <CheckCircle2 size={32} className="text-emerald-500 shadow-mesh-glow" />
-                     </div>
-                     <h3 className="text-xl font-black text-white mb-2 uppercase tracking-tight">Capital Cleared</h3>
-                     <p className="text-gray-500 text-xs font-bold leading-relaxed m-0">Vault handshake verified. Awaiting administrative node clearance.</p>
+                {statusData.status === 'pending' && (
+                  <div className="p-10 text-center border-double border-4 border-amber-500/20 bg-amber-500/5 rounded-3xl">
+                     <Clock className="w-14 h-14 text-amber-500 mb-6 mx-auto" />
+                     <h3 className="text-xl font-black text-white mb-3 uppercase tracking-tight">Request Processing</h3>
+                     <p className="text-gray-500 text-xs font-medium max-w-xs mx-auto leading-relaxed mb-0">
+                       Our intelligence officers are currently verifying your organizational credentials. No further action is required at this stage.
+                     </p>
                   </div>
                 )}
               </div>
