@@ -27,7 +27,10 @@ class AccountModel:
         if doc.get("email"):
             doc["email"] = doc["email"].strip().lower()
         if doc.get("phone_number"):
-            doc["phone_number"] = doc["phone_number"].strip()
+            phone = doc["phone_number"].strip().replace(" ", "")
+            if not phone.startswith("+"):
+                phone = "+" + phone
+            doc["phone_number"] = phone
             
         return doc
 
@@ -55,7 +58,10 @@ class AccountModel:
         if "plan" not in account_data:
             account_data["plan"] = "free"
         if account_data.get("phone_number"):
-            account_data["phone_number"] = account_data["phone_number"].strip()
+            phone = account_data["phone_number"].strip().replace(" ", "")
+            if not phone.startswith("+"):
+                phone = "+" + phone
+            account_data["phone_number"] = phone
 
         result = await db[cls.collection_name].insert_one(account_data)
         account_data["id"] = str(result.inserted_id)
@@ -82,7 +88,9 @@ class AccountModel:
         if not phone:
             return None
         db = get_db()
-        normalized_phone = phone.strip()
+        normalized_phone = phone.strip().replace(" ", "")
+        if not normalized_phone.startswith("+"):
+            normalized_phone = "+" + normalized_phone
         doc = await db[cls.collection_name].find_one({"phone_number": normalized_phone})
         return cls._normalize(doc)
 
@@ -118,7 +126,10 @@ class AccountModel:
         if update_data.get("email"):
             update_data["email"] = update_data["email"].strip().lower()
         if update_data.get("phone_number"):
-            update_data["phone_number"] = update_data["phone_number"].strip()
+            phone = update_data["phone_number"].strip().replace(" ", "")
+            if not phone.startswith("+"):
+                phone = "+" + phone
+            update_data["phone_number"] = phone
             
         db = get_db()
         result = await db[cls.collection_name].update_one(

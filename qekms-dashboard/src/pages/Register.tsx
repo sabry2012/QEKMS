@@ -149,7 +149,7 @@ export default function Register() {
         phone_number: formData.phone_number,
         otp_code: formData.otp_code
       });
-      
+
       // Then immediately register
       await api.post('/auth/register', formData);
       setSuccess(true);
@@ -207,10 +207,10 @@ export default function Register() {
         {/* Left Side: Brand Identity */}
         <div className="hidden lg:block max-w-xl shrink-0">
           <div className="mb-8 flex items-center gap-4">
-             <div className="w-12 h-12 bg-primary-cyan/10 border border-primary-cyan/20 rounded-2xl flex items-center justify-center">
-                <Shield className="text-primary-cyan" size={24} />
-             </div>
-             <p className="text-[10px] font-black tracking-[0.4em] text-primary-cyan uppercase opacity-80">Enterprise Protocol</p>
+            <div className="w-12 h-12 bg-primary-cyan/10 border border-primary-cyan/20 rounded-2xl flex items-center justify-center">
+              <Shield className="text-primary-cyan" size={24} />
+            </div>
+            <p className="text-[10px] font-black tracking-[0.4em] text-primary-cyan uppercase opacity-80">Enterprise Protocol</p>
           </div>
           <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] m-0 mb-8">
             <span className="text-white block">Quantum Access</span>
@@ -223,13 +223,13 @@ export default function Register() {
           </p>
         </div>
 
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           className="w-full max-w-xl bg-[#0d0d0f]/80 border border-white/10 rounded-[2.5rem] p-8 md:p-10 backdrop-blur-2xl shadow-2xl relative overflow-hidden group"
         >
           <div className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-primary-cyan/5 rounded-full blur-[80px]" />
-          
+
           <div className="mb-10 text-left lg:hidden">
             <p className="text-[9px] font-black tracking-[0.4em] text-primary-cyan mb-2 uppercase opacity-80">Enterprise Protocol</p>
             <h1 className="text-4xl font-black tracking-tighter leading-[0.95] m-0">
@@ -239,14 +239,13 @@ export default function Register() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="flex justify-between items-center mb-8 px-2">
+            <div className="flex justify-center items-center mb-10 gap-4">
               {[1, 2].map((s) => (
                 <div key={s} className="flex items-center">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black transition-all ${
-                    step === s ? 'bg-primary-cyan text-black shadow-mesh-glow' : 
-                    step > s ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20' : 
-                    'bg-white/5 text-gray-600 border border-white/10'
-                  }`}>
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black transition-all ${step === s ? 'bg-primary-cyan text-black shadow-mesh-glow' :
+                      step > s ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20' :
+                        'bg-white/5 text-gray-600 border border-white/10'
+                    }`}>
                     {step > s ? '✓' : s}
                   </div>
                   {s < 2 && <div className={`w-12 h-[1px] mx-2 ${step > s ? 'bg-emerald-500/20' : 'bg-white/5'}`} />}
@@ -256,7 +255,7 @@ export default function Register() {
 
             <AnimatePresence mode="wait">
               {step === 1 ? (
-                <motion.div 
+                <motion.div
                   key="step1"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -323,7 +322,7 @@ export default function Register() {
                   </div>
                 </motion.div>
               ) : (
-                <motion.div 
+                <motion.div
                   key="step2"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -363,14 +362,14 @@ export default function Register() {
             )}
 
             <div className="flex flex-col gap-4">
-              <Button 
-                type="submit" 
-                className="w-full h-14 bg-mesh-gradient shadow-mesh-glow font-black text-xs uppercase tracking-[0.2em] rounded-2xl" 
+              <Button
+                type="submit"
+                className="w-full h-14 bg-mesh-gradient shadow-mesh-glow font-black text-xs uppercase tracking-[0.2em] rounded-2xl"
                 isLoading={submitting}
               >
                 {step === 1 ? 'Verify Identity' : 'Provision Account'} <ArrowRight size={18} className="ml-2" />
               </Button>
-              <div id="google-signup-button" className="flex justify-center" />
+              <GoogleAuthButton id="google-signup-button" text="Initialize with Google" />
               <p className="text-center text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-4">
                 Already have node? <Link to="/login" className="text-primary-cyan hover:underline">Secure Login</Link>
               </p>

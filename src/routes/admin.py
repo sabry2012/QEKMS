@@ -108,7 +108,7 @@ async def admin_create_user(data: CreateUserRequest):
             detail=f"Invalid plan. Choose from: {list(PLAN_LIMITS.keys())}",
         )
 
-    hashed = get_password_hash(data.password)
+    hashed = get_password_hash(data.password.strip())
 
     if data.role == "admin":
         doc = {

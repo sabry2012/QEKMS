@@ -21,8 +21,8 @@ api.interceptors.response.use(
         // If successful, retry original request
         return api(originalRequest);
       } catch (refreshError) {
-        // If refresh fails, redirect to login or let the component handle it
-        return Promise.reject(refreshError);
+        // Return original error instead of "Refresh token missing"
+        return Promise.reject(error);
       }
     }
     

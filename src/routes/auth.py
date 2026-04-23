@@ -84,7 +84,7 @@ async def login(request: Request, response: Response, login_data: LoginRequest):
 
         # 2. Extract credentials & role
         email = login_data.email.strip().lower()
-        password = login_data.password
+        password = login_data.password.strip()
         role = login_data.role or "account"
 
         # 3. Retrieve user based on role
@@ -95,10 +95,10 @@ async def login(request: Request, response: Response, login_data: LoginRequest):
 
         # 4. Critical: Check if user exists before accessing any attributes
         if not user or not isinstance(user, dict):
-            logger.warning(f"Login failed: User not found ({email} | {role})")
+            logger.warning(f"Login failed: Identity not found ({email} | {role})")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials",
+                detail="Access Denied: This identity is not registered in the quantum mesh.",
             )
 
         # 5. Extract fields safely using .get()
@@ -108,17 +108,17 @@ async def login(request: Request, response: Response, login_data: LoginRequest):
 
         # 6. Verify password safely
         if not hashed_password or not verify_password(password, hashed_password):
-            logger.warning(f"Login failed: Password mismatch for {email}")
+            logger.warning(f"Login failed: Password mismatch for {email} (Role: {role})")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials",
+                detail="Access Denied: Invalid cipher key (password mismatch).",
             )
         
         # 7. Check activation status
-        if not user.get("is_active", True):
+        if not user.get("is_active", False):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account is inactive. Contact your administrator.",
+                detail="Account is pending administrator approval. Please wait for verification.",
             )
 
         # 8. Subscription enforcement for non-admins
@@ -248,7 +248,14 @@ async def google_login(request: Request, response: Response, google_data: Google
         role = user.get("role", "account")
         phone = user.get("phone_number")
 
-        # 3. Check for profile completion
+        # 3. Check activation status
+        if not user.get("is_active", False):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is pending administrator approval. Please wait for verification.",
+            )
+
+        # 4. Check for profile completion
         is_new = not bool(phone)
 
         # 4. Issue Tokens
@@ -333,7 +340,10 @@ async def complete_profile(
 ):
     """Allow new Google users to set and verify their unique phone number."""
     user_id = user_payload.get("id")
-    phone = reg_data.phone_number.strip()
+    phone = reg_data.phone_number.strip().replace(" ", "")
+    if not phone.startswith("+"):
+        phone = "+" + phone
+        
     otp_code = reg_data.otp_code.strip()
     
     # 1. Verify OTP (and delete it this time)
@@ -379,7 +389,10 @@ async def register(request: Request, reg_data: RegisterRequest):
             )
 
         # Check for existing user by phone number
-        phone = reg_data.phone_number.strip()
+        phone = reg_data.phone_number.strip().replace(" ", "")
+        if not phone.startswith("+"):
+            phone = "+" + phone
+            
         otp_code = reg_data.otp_code.strip()
 
         # 1. Verify OTP (Final consumption)
@@ -409,7 +422,7 @@ async def register(request: Request, reg_data: RegisterRequest):
             "phone_number": phone,
             "role": "account",
             "admin_account": "Self Registration",
-            "is_active": True,
+            "is_active": False,
             "plan": plan,
             "channels_limit": limits["channels_limit"],
             "encryption_limit": limits["encryption_limit"],
@@ -467,7 +480,7 @@ async def refresh_tokens(request: Request, response: Response):
     """Rotate the refresh token and issue a new access token."""
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
-        raise HTTPException(status_code=401, detail="Refresh token missing")
+        raise HTTPException(status_code=401, detail="Session expired or invalid. Please login again.")
 
     try:
         # Validate refresh token

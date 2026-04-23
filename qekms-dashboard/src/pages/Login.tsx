@@ -211,7 +211,7 @@ export default function Login() {
                 Access Node <ArrowRight size={18} className="ml-2" />
               </Button>
 
-              <div id="google-signin-button" className="flex justify-center" />
+              <GoogleAuthButton id="google-signin-button" text="Rejoin with Google" />
               
               <p className="text-center text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-4">
                 New Node? <Link to="/register" className="text-primary-cyan hover:underline transition-all">Provision Now</Link>

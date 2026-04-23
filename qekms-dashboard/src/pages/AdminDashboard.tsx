@@ -6,7 +6,7 @@ import {
   Users, Shield, Activity, Settings, UserPlus, Radio, RefreshCw, Trash2, CheckCircle2,
   XCircle, LogOut, Plus, Globe, ToggleLeft, ToggleRight, AlertTriangle, Zap,
   Cpu, Lock, Fingerprint, Database, Terminal, ChevronRight, MessageSquare, Send, UserCircle, Search,
-  Paperclip, Mic, StopCircle, FileText, X, Download, Play, SendHorizonal, PlayCircle, PauseCircle
+  Paperclip, Mic, StopCircle, FileText, X, Download, Play, SendHorizonal, PlayCircle, PauseCircle, Mail, Copy, Check
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
@@ -50,6 +50,8 @@ interface ClientRequest {
   payment_status?: string;
   payment_reference?: string;
   amount?: number;
+  type?: string;
+  notes?: string;
 }
 
 interface Channel {
@@ -846,17 +848,23 @@ export default function AdminDashboard() {
                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-inner transition-transform duration-500 group-hover:scale-110 ${user.is_active ? 'bg-primary-cyan/10' : 'bg-gray-500/10'}`}>
                           <Users size={20} className={user.is_active ? 'text-primary-cyan' : 'text-gray-500'} />
                         </div>
-                        <div className="min-w-0 pr-2">
-                          <p className="m-0 text-[14px] font-black text-white tracking-tight truncate flex items-center gap-2">
-                              {user.email}
-                              {!user.is_active && <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-500 text-[8px] uppercase tracking-widest">Inactive</span>}
+                        <div className="min-w-0 flex-1">
+                          <p className="m-0 text-[14px] font-black text-white tracking-tight truncate group-hover:text-primary-cyan transition-colors">
+                            {user.email}
                           </p>
-                          <div className="flex items-center gap-2 mt-1.5">
-                              <p className="m-0 text-[10px] text-gray-500 font-bold uppercase tracking-widest">{user.plan || 'standard'} · NODE</p>
-                              <span className="w-1 h-1 rounded-full bg-white/10" />
-                              <span className="text-[9px] font-black text-primary-cyan uppercase tracking-widest flex items-center gap-1 bg-primary-cyan/10 px-1.5 rounded">
-                                  <Radio size={10} /> MESH: {user.channels_created_total || 0}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+                            <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest shrink-0">
+                              {user.plan || 'standard'} · NODE
+                            </span>
+                            {!user.is_active && (
+                              <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-500 text-[8px] font-black uppercase tracking-widest shrink-0">
+                                Inactive
                               </span>
+                            )}
+                            <span className="text-[9px] font-black text-primary-cyan uppercase tracking-widest flex items-center gap-1.5 bg-primary-cyan/5 px-2 py-0.5 rounded-md border border-primary-cyan/10 shrink-0">
+                              <Radio size={10} className="animate-pulse" /> 
+                              <span>TUNNELS: {user.channels_created_total || 0}</span>
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -867,6 +875,23 @@ export default function AdminDashboard() {
                         <button onClick={() => setResetUser(user)} className="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-500 hover:bg-violet-500/20 border-none cursor-pointer flex items-center justify-center transition-all">
                           <Lock size={16} />
                         </button>
+                        {!user.is_active ? (
+                          <button 
+                            onClick={() => handleAction(`/admin/update-user/${user.id}`, 'put', { is_active: true })} 
+                            className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-none cursor-pointer flex items-center justify-center transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                            title="Approve & Activate"
+                          >
+                            <CheckCircle2 size={16} />
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => handleAction(`/admin/update-user/${user.id}`, 'put', { is_active: false })} 
+                            className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-none cursor-pointer flex items-center justify-center transition-all"
+                            title="Deactivate Node"
+                          >
+                            <XCircle size={16} />
+                          </button>
+                        )}
                         <button onClick={() => handleAction(`/admin/delete-user/${user.id}`, 'delete')} className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 border-none cursor-pointer flex items-center justify-center transition-all">
                           <Trash2 size={16} />
                         </button>
@@ -1205,26 +1230,28 @@ export default function AdminDashboard() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredClientsList.map(client => (
-                    <Card key={client.id} className="p-6 flex flex-col gap-6 border-white/5 bg-white/[0.03] relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-20 transition-opacity">
-                        <UserCircle size={60} className="text-primary-cyan" />
-                      </div>
-
+                    <Card key={client.id} className="p-8 flex flex-col gap-6 border-white/5 bg-[#0d0d0f]/40 backdrop-blur-3xl relative overflow-hidden group hover:border-primary-cyan/20 transition-all duration-500 shadow-2xl">
+                      {/* Ambient Glow */}
+                      <div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-primary-cyan/5 rounded-full blur-[60px] opacity-0 group-hover:opacity-100 transition-opacity" />
+                      
                       <div className="flex justify-between items-start relative z-10">
-                        <div className="space-y-1">
-                          <p className="m-0 text-[18px] font-black text-white tracking-tight flex items-center gap-2">
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <p className="m-0 text-[18px] font-black text-white tracking-tight flex items-center gap-2 truncate">
                              {client.full_name}
-                             {(client as any).is_deleted && <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-500 text-[8px] uppercase tracking-widest">DELETED</span>}
+                             {(client as any).is_deleted && <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-500 text-[8px] font-black uppercase tracking-widest">DELETED</span>}
                           </p>
-                          <p className="m-0 text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">{client.company}</p>
+                          <div className="flex items-center gap-2">
+                             <div className="w-1.5 h-1.5 rounded-full bg-primary-cyan/40" />
+                             <p className="m-0 text-[10px] text-gray-500 font-black uppercase tracking-[0.2em] truncate">{client.company}</p>
+                          </div>
                         </div>
-                        <div className="flex flex-col items-end gap-2">
+                        <div className="flex flex-col items-end gap-3 shrink-0 ml-4">
                           <StatusBadge status={client.status} />
                           {!(client as any).is_deleted && (
                             <button 
                               onClick={() => handleAction(`/admin/clients/${client.id}`, 'delete')}
-                              className="text-gray-500 hover:text-red-500 bg-transparent border-none cursor-pointer transition-colors"
-                              title="Delete Request"
+                              className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-gray-600 hover:text-red-500 hover:bg-red-500/10 border-none cursor-pointer transition-all"
+                              title="Purge Request"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -1232,24 +1259,66 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
-                      <div className="flex gap-2 flex-wrap pb-2 border-b border-white/5 relative z-10">
-                        <span className="text-[10px] text-primary-cyan bg-primary-cyan/10 px-3 py-1 rounded-lg font-black uppercase tracking-wider">{client.plan}</span>
-                        <span className="text-[10px] text-gray-500 bg-white/5 px-3 py-1 rounded-lg font-mono">{client.email}</span>
+                      <div className="flex flex-wrap items-center gap-2 pb-5 border-b border-white/5 relative z-10">
+                        <div className="h-8 px-3 rounded-xl bg-primary-cyan/5 border border-primary-cyan/10 flex items-center gap-2 shrink-0">
+                           <Zap size={12} className="text-primary-cyan" />
+                           <span className="text-[9px] text-primary-cyan font-black uppercase tracking-wider">{client.plan}</span>
+                        </div>
+                        {client.type === 'expert_consultation' && (
+                          <div className="h-8 px-3 rounded-xl bg-violet-500/5 border border-violet-500/10 flex items-center gap-2 shrink-0">
+                            <Shield size={12} className="text-violet-500" />
+                            <span className="text-[9px] text-violet-500 font-black uppercase tracking-wider">Consultation</span>
+                          </div>
+                        )}
+                        <div className="h-8 px-3 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2 shrink-0 min-w-0 flex-1 sm:flex-none">
+                           <Mail size={12} className="text-gray-500 shrink-0" />
+                           <span className="text-[9px] text-gray-400 font-mono truncate">{client.email}</span>
+                        </div>
                       </div>
 
+                      {client.notes && (
+                        <div className="relative group/notes z-10">
+                          <div className="p-5 rounded-2xl bg-black/60 border border-white/5 group-hover/notes:border-primary-cyan/20 transition-all">
+                             <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                   <MessageSquare size={10} className="text-gray-600" />
+                                   <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Message Payload</span>
+                                </div>
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(client.notes || '');
+                                    setSuccess('Message payload copied to clipboard');
+                                  }}
+                                  className="p-1.5 rounded-md bg-white/5 hover:bg-primary-cyan/10 text-gray-500 hover:text-primary-cyan border-none cursor-pointer transition-all flex items-center gap-1.5"
+                                  title="Copy to Clipboard"
+                                >
+                                  <Copy size={10} />
+                                  <span className="text-[8px] font-black uppercase tracking-widest">Copy</span>
+                                </button>
+                             </div>
+                             <div className="max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                               <p className="m-0 text-[12px] text-gray-400 leading-relaxed font-medium whitespace-pre-wrap break-words">
+                                 {client.notes}
+                               </p>
+                             </div>
+                          </div>
+                        </div>
+                      )}
+
                       {client.status === 'pending' && (
-                        <div className="flex flex-col gap-3 mt-auto relative z-10">
+                        <div className="flex gap-3 mt-auto relative z-10 pt-2">
                           <button
                             onClick={() => handleAction(`/admin/clients/${client.id}/approve`, 'put')}
-                            className="w-full py-4 rounded-2xl border-none cursor-pointer bg-mesh-gradient text-white font-black text-[13px] uppercase tracking-widest flex items-center justify-center gap-3 hover:opacity-90 transition-all shadow-mesh-glow"
+                            className="flex-1 h-14 rounded-2xl border-none cursor-pointer bg-primary-cyan text-white font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-primary-cyan/80 transition-all shadow-mesh-glow shadow-primary-cyan/20 group/btn"
                           >
-                            <CheckCircle2 size={18} /> Provision Access
+                            <CheckCircle2 size={16} className="group-hover/btn:scale-110 transition-transform" /> Provision
                           </button>
                           <button
                             onClick={() => handleAction(`/admin/clients/${client.id}/reject`, 'put')}
-                            className="w-full py-3 rounded-2xl border border-white/10 bg-transparent text-gray-600 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-500/10 hover:text-red-500 transition-all"
+                            className="w-14 h-14 rounded-2xl border border-white/10 bg-white/5 text-gray-500 hover:text-red-500 hover:bg-red-500/10 transition-all cursor-pointer flex items-center justify-center"
+                            title="Decline Request"
                           >
-                            <XCircle size={16} /> Decline Request
+                            <XCircle size={20} />
                           </button>
                         </div>
                       )}
@@ -1446,6 +1515,22 @@ export default function AdminDashboard() {
               <img src={previewImage} alt="preview" className="max-w-full max-h-full object-contain shadow-2xl rounded-sm animate-in zoom-in-95" onClick={e => e.stopPropagation()} />
           </div>
       )}
+<style>{`
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(6, 182, 212, 0.2);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(6, 182, 212, 0.4);
+  }
+`}</style>
     </div>
   );
 }

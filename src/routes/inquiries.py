@@ -16,16 +16,21 @@ class ExpertInquirySchema(BaseModel):
 @inquiries_router.post("/expert")
 async def create_expert_inquiry(inquiry: ExpertInquirySchema, request: Request):
     try:
-        # Save to database
-        data = inquiry.dict()
-        data["type"] = "expert_consultation"
+        # Save to database (Mapped to ClientRequestModel schema)
+        data = {
+            "full_name": inquiry.full_name,
+            "email": inquiry.email,
+            "company": inquiry.organization,
+            "notes": inquiry.message,
+            "plan": inquiry.plan,
+            "type": "expert_consultation",
+            "status": "pending"
+        }
         result = await ClientRequestModel.create(data)
         
-        # Log to audit
+        # Log to audit (Fixed argument: event instead of event_type)
         await AuditService.log_event(
-            event_type="EXPERT_INQUIRY_CREATED",
-            description=f"New expert inquiry from {inquiry.full_name} ({inquiry.organization})",
-            severity="info",
+            event="EXPERT_INQUIRY_CREATED",
             metadata={"email": inquiry.email, "plan": inquiry.plan}
         )
         
