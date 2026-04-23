@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     # Set to True in production (HTTPS) to enable secure cookie flags.
     SECURE_COOKIES: bool = False
 
+    # ── Email Verification ────────────────────────────────────────────
+    EMAIL_LIST_VERIFY_API_KEY: Optional[str] = None
+
 
     model_config = {
         "env_file": ".env",

@@ -8,6 +8,7 @@ from src.models.SettingsModel import PLAN_LIMITS # Added for potential future pa
 CLIENT_PLANS = ["starter", "professional", "enterprise"] # Explicitly in sync with frontend
 from email_validator import validate_email, EmailNotValidError
 import phonenumbers
+from src.services.EmailVerificationService import EmailVerificationService
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ async def submit_access_request(data: ClientRequestCreate):
         )
 
     # Validate Email via Syntax and MX checks
+    print(f"\n>>> ATTEMPTING CLIENT REQUEST FOR EMAIL: {data.email}")
     try:
         email_info = validate_email(str(data.email), check_deliverability=True)
         domain = email_info.domain.lower()
@@ -68,6 +70,15 @@ async def submit_access_request(data: ClientRequestCreate):
         clean_email = email_info.normalized
     except EmailNotValidError as e:
         raise HTTPException(status_code=400, detail=f"Email Validation Failed: {str(e)}")
+
+    # ── Real-time Email Existence Verification ───────────────────────
+    is_email_valid = await EmailVerificationService.verify_email(clean_email)
+    if not is_email_valid:
+        raise HTTPException(
+            status_code=400,
+            detail="Security validation failed: The provided email identity does not exist or is invalid."
+        )
+    # ──────────────────────────────────────────────────────────────────
 
     # Check for existing active (non-rejected) request with same email
     existing = await ClientRequestModel.get_by_email(clean_email)

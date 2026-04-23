@@ -13,6 +13,7 @@ from src.models.ClientRequestModel import ClientRequestModel
 from src.models.SettingsModel import SettingsModel, PLAN_LIMITS, DEFAULT_PLAN, CLIENT_PLANS, PLAN_DURATION_DAYS
 from src.models.ModelsSchemas.ClientRequestSchema import RejectRequestBody
 from src.services.AuditService import AuditService
+from src.services.EmailVerificationService import EmailVerificationService
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +102,15 @@ async def admin_create_user(data: CreateUserRequest):
     existing_admin = await AdminModel.get_by_email(data.email)
     if existing_account or existing_admin:
         raise HTTPException(status_code=400, detail="Email already registered")
+
+    # ── Real-time Email Existence Verification ───────────────────────
+    is_email_valid = await EmailVerificationService.verify_email(data.email)
+    if not is_email_valid:
+        raise HTTPException(
+            status_code=400,
+            detail="Security validation failed: The provided email identity does not exist or is invalid."
+        )
+    # ──────────────────────────────────────────────────────────────────
 
     if data.plan not in PLAN_LIMITS:
         raise HTTPException(

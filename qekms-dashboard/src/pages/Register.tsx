@@ -117,7 +117,10 @@ export default function Register() {
 
     setSubmitting(true);
     try {
-      await api.post('/auth/request-otp', { phone_number: formData.phone_number });
+      await api.post('/auth/request-otp', { 
+        phone_number: formData.phone_number,
+        email: formData.email
+      });
       setStep(2);
       setCountdown(60);
       const timer = setInterval(() => {

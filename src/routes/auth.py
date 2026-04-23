@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from pydantic import BaseModel, EmailStr
@@ -20,6 +21,7 @@ from src.helpers.google_auth import verify_google_token
 from src.models.PhoneOtpModel import PhoneOtpModel
 from src.services.SmsService import SmsService
 from src.services.AuditService import AuditService
+from src.services.EmailVerificationService import EmailVerificationService
 
 logger = logging.getLogger(__name__)
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -293,6 +295,7 @@ async def google_login(request: Request, response: Response, google_data: Google
 
 class OtpRequest(BaseModel):
     phone_number: str
+    email: Optional[EmailStr] = None
 
 
 @auth_router.post("/verify-otp")
@@ -328,6 +331,16 @@ async def request_otp(data: OtpRequest):
     if existing:
         raise HTTPException(status_code=400, detail="This phone number is already registered.")
     
+    # ── Email Existence Verification ─────────────────────────────────
+    if data.email:
+        is_email_valid = await EmailVerificationService.verify_email(data.email)
+        if not is_email_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security validation failed: The provided email identity does not exist or is invalid."
+            )
+    # ──────────────────────────────────────────────────────────────────
+
     code = await PhoneOtpModel.create_otp(phone)
     await SmsService.send_otp(phone, code)
     return {"status": "success", "message": "OTP sent successfully"}
@@ -379,6 +392,18 @@ async def register(request: Request, reg_data: RegisterRequest):
         password = reg_data.password.strip()
         full_name = reg_data.full_name.strip() or "New User"
         plan = (reg_data.plan or DEFAULT_PLAN).strip().lower()
+
+        print(f"\n>>> ATTEMPTING REGISTRATION FOR EMAIL: {email}")
+
+        # ── Email Existence Verification ─────────────────────────────────
+        is_email_valid = await EmailVerificationService.verify_email(email)
+        if not is_email_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security validation failed: The provided email identity does not exist or is invalid."
+            )
+        # ──────────────────────────────────────────────────────────────────
+
 
         # Check for existing user by email
         existing_email = await AccountModel.get_by_email(email) or await AdminModel.get_by_email(email)

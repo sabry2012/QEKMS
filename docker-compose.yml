@@ -52,6 +52,7 @@ services:
       - DATABASE_NAME=qekms_db
       - SECRET_KEY=super_secure_key_123!
       - REDIS_URL=redis://redis:6379/0
+      - EMAIL_LIST_VERIFY_API_KEY=RtW7plkWr9MF5gvRMFuZ5zVrzurGr9rO
     volumes:
       - .:/app
       - uploads_data:/app/uploads
