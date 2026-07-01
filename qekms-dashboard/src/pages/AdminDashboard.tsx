@@ -15,6 +15,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { InlineLoader } from '../components/InlineLoader';
+import { CryptoVisualizerModal } from '../components/CryptoVisualizerModal';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface AuditLog {
@@ -295,6 +296,8 @@ export default function AdminDashboard() {
   const [clients, setClients] = useState<ClientRequest[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [quantumHealth, setQuantumHealth] = useState<QuantumStatus | null>(null);
   const [sysSettings, setSysSettings] = useState<any>({});
   const [sysStats, setSysStats] = useState<any>({});
@@ -427,7 +430,7 @@ export default function AdminDashboard() {
     e.preventDefault();
     await handleAction('/admin/create-user', 'post', newUser);
     setShowAddForm(false);
-    setNewUser({ email: '', password: '', role: 'account', plan: 'pro' });
+    setNewUser({ email: '', password: '', role: 'account', plan: 'professional' });
   };
 
 
@@ -443,6 +446,11 @@ export default function AdminDashboard() {
     await handleAction('/admin/quantum/recalibrate', 'post');
     // Re-fetch health immediately to get updated entropy metrics
     fetchSysHealth();
+  };
+
+  const handleOpenVisualizer = (log: AuditLog) => {
+    setSelectedLog(log);
+    setIsModalOpen(true);
   };
 
   // ── MESSAGING LOGIC ──
@@ -645,7 +653,12 @@ export default function AdminDashboard() {
     .filter(u => overviewUserFilter === 'all' ? true : (overviewUserFilter === 'active' ? u.is_active : !u.is_active));
 
   const filteredOperators = users
-    .filter(u => usersFilter === 'all' ? true : (usersFilter === 'admin' ? u.role === 'admin' : u.plan === usersFilter));
+    .filter(u => {
+      if (usersFilter === 'all') return true;
+      if (usersFilter === 'admin') return u.role === 'admin';
+      if (usersFilter === 'pending') return !u.is_active;
+      return u.plan === usersFilter;
+    });
 
   const filteredClientsList = clients
     .filter(c => showDeletedClients ? true : !(c as any).is_deleted)
@@ -862,6 +875,7 @@ export default function AdminDashboard() {
                       onChange={setUsersFilter}
                       options={[
                         { value: 'all', label: 'ALL OPERATORS' },
+                        { value: 'pending', label: 'PENDING APPROVAL' },
                         { value: 'admin', label: 'ADMINISTRATORS' },
                         { value: 'starter', label: 'STARTER' },
                         { value: 'professional', label: 'PROFESSIONAL' },
@@ -1527,15 +1541,25 @@ export default function AdminDashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {auditLogs.map(log => (
+                        {auditLogs.map((log) => {
+                          const eventName = String(log.event || (log as any).event_type || (log as any).type || '').toUpperCase().trim();
+                          const canAnalyze = eventName === 'MESSAGE_SENT' || eventName === 'KEY_GENERATED';
+                          return (
                           <tr key={log.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                             <td className="px-8 py-5 text-gray-500 font-mono text-[11px] whitespace-nowrap">{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '---'}</td>
-                            <td className="px-8 py-5 font-black text-white tracking-tight">{log.event}</td>
+                            <td className="px-8 py-5 font-black text-white tracking-tight">{eventName}</td>
                             <td className="px-8 py-5 text-gray-400 font-bold truncate max-w-[150px]">{log.user_id || 'SYSTEM_CORE'}</td>
                             <td className="px-8 py-5"><StatusBadge status={log.details?.severity || 'INFO'} /></td>
-                            <td className="px-8 py-5 text-[11px] text-gray-600 font-mono italic">{log.details?.ip ? `IPV4://${log.details.ip}` : 'Internal Sequence'}</td>
+                            <td className="px-8 py-5 text-[11px] text-gray-600 font-mono italic flex items-center justify-between gap-4">
+                              <span>{log.details?.ip ? `IPV4://${log.details.ip}` : 'Internal Sequence'}</span>
+                              {canAnalyze && (
+                                <Button onClick={() => handleOpenVisualizer(log)} className="h-7 text-[10px] font-black px-3 whitespace-nowrap">
+                                  {eventName === 'MESSAGE_SENT' ? 'Analyze Flow' : 'Analyze Entropy'}
+                                </Button>
+                              )}
+                            </td>
                           </tr>
-                        ))}
+                        )})}
                       </tbody>
                     </table>
                   </div>
@@ -1620,6 +1644,13 @@ export default function AdminDashboard() {
           <img src={previewImage} alt="preview" className="max-w-full max-h-full object-contain shadow-2xl rounded-sm animate-in zoom-in-95" onClick={e => e.stopPropagation()} />
         </div>
       )}
+      
+      <CryptoVisualizerModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        log={selectedLog} 
+      />
+      
       <style>{`
   .custom-scrollbar::-webkit-scrollbar {
     width: 4px;

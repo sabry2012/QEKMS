@@ -5,7 +5,7 @@ import {
   UserCircle, Search, Plus, RefreshCw,
   Cpu, Zap, Fingerprint, Globe, AlertTriangle,
   Paperclip, Mic, StopCircle, FileText, X, Download, Play,
-  ChevronLeft, Radio, SendHorizonal, Trash2
+  ChevronLeft, Radio, SendHorizonal, Trash2, LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axiosConfig';
@@ -49,7 +49,8 @@ interface Channel {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -197,6 +198,30 @@ export default function Dashboard() {
       setLoadingMessages(false);
     }
   }, [isSecurityReady]);
+  
+  const handleContactSupport = async () => {
+    const adminEmail = "sabrygomaasem@gmail.com";
+    try {
+      const { data } = await api.post('/channels/', { receiver_email: adminEmail });
+      fetchChannels();
+      const targetChannel = data.channel;
+      setActiveChannel(targetChannel);
+      loadInitialMessages(targetChannel);
+    } catch (err) {
+      console.error("Support connection failed:", err);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!activeChannel) return;
+    try {
+      await api.delete(`/channels/${activeChannel.id}/messages/${messageId}`);
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+    } catch (err) {
+      console.error("Failed to delete message:", err);
+    }
+  };
+
 
   // ── 4. WebSockets ──────────────────────────────────────────────────
   useEffect(() => {
@@ -443,14 +468,23 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-2">
                     <button 
-                        onClick={() => fetchChannels()}
-                        className="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-white transition-colors bg-white/5 rounded-lg border-none cursor-pointer"
+                        onClick={handleContactSupport}
+                        className="w-9 h-9 flex items-center justify-center text-primary-cyan hover:text-white transition-colors bg-primary-cyan/10 rounded-lg border-none cursor-pointer"
+                        title="Contact Support"
                     >
-                        <RefreshCw size={16} className={loadingChannels ? 'animate-spin' : ''} />
+                        <ShieldIcon size={16} />
+                    </button>
+                    <button 
+                        onClick={logout}
+                        className="w-9 h-9 flex items-center justify-center text-red-500 hover:text-white transition-colors bg-red-500/10 rounded-lg border-none cursor-pointer"
+                        title="Logout"
+                    >
+                        <LogOut size={16} />
                     </button>
                     <button 
                         onClick={() => setShowCreateChannel(true)}
                         className="w-9 h-9 flex items-center justify-center bg-mesh-gradient text-white rounded-lg border-none cursor-pointer shadow-mesh-glow transition-transform active:scale-95"
+                        title="New Node Mapping"
                     >
                         <Plus size={18} />
                     </button>
@@ -542,7 +576,7 @@ export default function Dashboard() {
                                 
                                 <button
                                     onClick={(e) => handleClearChat(channel.id, e)}
-                                    className="w-8 h-8 rounded-lg bg-white/5 hover:bg-red-500/10 text-gray-400 hover:text-red-500 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shrink-0 border-none cursor-pointer"
+                                    className="w-8 h-8 rounded-lg bg-white/5 hover:bg-red-500/10 text-gray-500 hover:text-red-500 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shrink-0 border-none cursor-pointer"
                                     title="Clear History"
                                 >
                                     <Trash2 size={14} />
@@ -628,17 +662,17 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                                 {keyStatus === 'ready' ? (
-                                    <div className="flex items-center gap-2">
-                                        <Fingerprint size={16} />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] mt-0.5">Cipher Validated</span>
-                                    </div>
-                                 ) : (
-                                    <div className="flex items-center gap-2">
-                                        <RefreshCw size={16} className="animate-spin" />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] mt-0.5">Handshaking...</span>
-                                    </div>
-                                 )}
+                        {keyStatus === 'ready' ? (
+                            <div className="flex items-center gap-2 text-primary-cyan px-3 py-1.5 bg-primary-cyan/10 rounded-xl border border-primary-cyan/20 shadow-mesh-glow">
+                                <Fingerprint size={16} />
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em]">Cipher Validated</span>
+                            </div>
+                         ) : (
+                            <div className="flex items-center gap-2 text-amber-500 px-3 py-1.5 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                                <RefreshCw size={14} className="animate-spin" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em]">Handshaking...</span>
+                            </div>
+                         )}
                     </div>
 
                     {/* Messages */}
@@ -662,11 +696,21 @@ export default function Dashboard() {
                                                 className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                                             >
                                                 <div className={`max-w-[80%] lg:max-w-[240px] group flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                                    <div className={`rounded-xl shadow-lg transition-all overflow-hidden ${
+                                                    <div className={`rounded-xl shadow-lg transition-all overflow-hidden relative group/msg ${
                                                         isMe 
                                                             ? 'bg-blue-600 text-white rounded-tr-none' 
                                                             : 'bg-zinc-800 text-gray-200 rounded-tl-none'
                                                     }`}>
+                                                        {/* Delete message button */}
+                                                        {(isMe || isAdmin) && (
+                                                          <button 
+                                                            onClick={() => handleDeleteMessage(msg.id)}
+                                                            className="absolute top-1 right-1 opacity-0 group-hover/msg:opacity-100 transition-opacity bg-black/40 p-1 rounded-md hover:bg-red-500/40 text-white/60 hover:text-white"
+                                                          >
+                                                            <X size={12} />
+                                                          </button>
+                                                        )}
+
                                                         {/* Unified Media Renderer */}
                                                         {(() => {
                                                             const mediaUrl = msg.file_path?.startsWith('http') ? msg.file_path : `${(import.meta as any).env.VITE_BACKEND_URL || 'http://localhost:8000'}/uploads/${msg.file_path}`;

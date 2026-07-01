@@ -117,3 +117,12 @@ class MessageModel:
             ]
         })
         return result.deleted_count
+    @classmethod
+    async def delete_by_id(cls, message_id: str):
+        try:
+            oid = ObjectId(message_id)
+        except (InvalidId, TypeError):
+            return False
+        db = get_db()
+        result = await db[cls.collection_name].delete_one({"_id": oid})
+        return result.deleted_count > 0

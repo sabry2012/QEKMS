@@ -5,6 +5,7 @@ import { InlineLoader } from '../components/InlineLoader';
 import { ErrorState } from '../components/ErrorState';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { CryptoVisualizerModal } from '../components/CryptoVisualizerModal';
 
 interface AuditLog {
   id?: string;
@@ -18,7 +19,14 @@ export default function AuditLogsDashboard() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleOpenVisualizer = (log: AuditLog) => {
+    setSelectedLog(log);
+    setIsModalOpen(true);
+  };
 
   const loadLogs = useCallback(async (isBackground = false) => {
     if (!isBackground) {
@@ -143,11 +151,13 @@ export default function AuditLogsDashboard() {
                   </td>
                 </tr>
               ) : (
-                logs.map((log, index) => (
-                  <tr key={log.id || `${log.event}-${index}`} className="hover:bg-white/[0.03] transition-all group align-top">
+                logs.map((log, index) => {
+                  const eventName = String(log.event || (log as any).event_type || (log as any).type || '').toUpperCase().trim();
+                  return (
+                  <tr key={log.id || `${eventName}-${index}`} className="hover:bg-white/[0.03] transition-all group align-top">
                     <td className="px-8 py-6">
                        <span className="inline-flex items-center gap-2 bg-mesh-gradient text-white px-4 py-1.5 rounded-lg text-[10px] uppercase tracking-widest font-bold transform group-hover:-translate-y-0.5 transition-all shadow-mesh-glow/50">
-                          {log.event}
+                          {eventName}
                        </span>
                     </td>
                     <td className="px-6 py-6 pt-7">
@@ -160,14 +170,21 @@ export default function AuditLogsDashboard() {
                        {formatTimestamp(log.timestamp)}
                     </td>
                     <td className="px-8 py-6">
-                       <div className="flex justify-end">
-                          <pre className="bg-black/40 border border-white/10 rounded-xl p-5 text-[11px] text-gray-400 font-mono leading-relaxed overflow-auto max-w-lg max-h-48 group-hover:border-primary-cyan/30 transition-all shadow-inner no-scrollbar">
+                       <div className="flex justify-end w-full">
+                          <pre className="bg-black/40 border border-white/10 rounded-xl p-5 text-[11px] text-gray-400 font-mono leading-relaxed w-full max-w-3xl whitespace-pre-wrap break-all group-hover:border-primary-cyan/30 transition-all shadow-inner no-scrollbar">
                              {JSON.stringify(log.details || {}, null, 3)}
                           </pre>
                        </div>
+                       {(eventName === 'MESSAGE_SENT' || eventName === 'KEY_GENERATED') && (
+                          <div className="flex justify-end mt-4">
+                            <Button onClick={() => { console.log('Opening modal for log:', log); handleOpenVisualizer(log); }} className="h-8 text-xs font-bold px-4">
+                              {eventName === 'MESSAGE_SENT' ? 'Analyze Cryptographic Flow' : 'Analyze Quantum Entropy'}
+                            </Button>
+                          </div>
+                       )}
                     </td>
                   </tr>
-                ))
+                )})
               )}
             </tbody>
           </table>
@@ -182,6 +199,11 @@ export default function AuditLogsDashboard() {
              Sovereign Ledger Ops // Cryptographically Signed & Immutable
           </p>
       </footer>
+      <CryptoVisualizerModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        log={selectedLog} 
+      />
     </div>
   );
 }

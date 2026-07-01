@@ -215,12 +215,21 @@ async def google_login(request: Request, response: Response, google_data: Google
         
         full_name = id_info.get("name", "Google User")
         
-        # 2. Check if user exists
+        # 2. Check if user exists in either collection
+        admin_user = await AdminModel.get_by_email(email)
         user = await AccountModel.get_by_email(email)
         
-        if not user:
-            # Create new user if they don't exist
-            # Note: For Google login, we might need a placeholder password or skip it
+        if admin_user:
+            user = admin_user
+            role = "admin"
+            is_new = False
+            logger.info(f"Admin logged in via Google: {email}")
+        elif user:
+            role = user.get("role", "account")
+            is_new = not bool(user.get("phone_number"))
+            logger.info(f"Existing user logged in via Google: {email}")
+        else:
+            # Create new regular user if they don't exist
             now = datetime.utcnow()
             plan = DEFAULT_PLAN
             duration = PLAN_DURATION_DAYS.get(plan, 30)
@@ -228,11 +237,11 @@ async def google_login(request: Request, response: Response, google_data: Google
             
             user_data = {
                 "email": email,
-                "password": get_password_hash("GOOGLE_AUTH_PLACEHOLDER_" + email), # Secure placeholder
+                "password": get_password_hash("GOOGLE_AUTH_PENDING_PWD_" + email),
                 "full_name": full_name,
                 "role": "account",
                 "admin_account": "Google OAuth",
-                "is_active": True,
+                "is_active": True, # Allow them to proceed to complete-profile initially
                 "plan": plan,
                 "channels_limit": limits["channels_limit"],
                 "encryption_limit": limits["encryption_limit"],
@@ -243,11 +252,12 @@ async def google_login(request: Request, response: Response, google_data: Google
                 "last_modification": now,
             }
             user = await AccountModel.create(user_data)
+            role = "account"
+            is_new = True
             logger.info(f"New user created via Google login: {email}")
         
         user_id = user.get("id") or str(user.get("_id", ""))
         user_email = user.get("email")
-        role = user.get("role", "account")
         phone = user.get("phone_number")
 
         # 3. Check activation status
@@ -257,8 +267,11 @@ async def google_login(request: Request, response: Response, google_data: Google
                 detail="Account is pending administrator approval. Please wait for verification.",
             )
 
-        # 4. Check for profile completion
-        is_new = not bool(phone)
+        # 4. Check for profile completion (Skip for admins)
+        if role == "admin":
+            is_new = False
+        else:
+            is_new = not bool(phone)
 
         # 4. Issue Tokens
         token_payload = {
@@ -313,10 +326,7 @@ async def verify_otp(data: OtpVerifyRequest):
 class CompleteProfileRequest(BaseModel):
     phone_number: str   
     otp_code: str
-    card_holder: str
-    card_number: str
-    card_expiry: str
-    card_cvv: str
+    password: str
 
 
 
@@ -382,8 +392,13 @@ async def complete_profile(
             detail="This phone number is already registered."
         )
     
+    # 3. Hash the new password and deactivate account for admin approval
+    hashed_password = get_password_hash(reg_data.password)
+    
     updated = await AccountModel.update(user_id, {
-        "phone_number": phone
+        "phone_number": phone,
+        "password": hashed_password,
+        "is_active": False # DEACTIVATE until admin approves
     })
     if not updated:
         raise HTTPException(status_code=404, detail="User not found")

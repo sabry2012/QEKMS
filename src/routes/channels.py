@@ -290,6 +290,9 @@ async def create_channel(
             "sender": sender_email,
             "receiver": receiver_email,
             "key_version": 1,
+            "master_key_hex": master_key.hex(),
+            "derived_encryption_key_hex": qekms.derive_encryption_key(master_key).hex(),
+            "derived_signing_key_hex": qekms.derive_signing_key(master_key).hex(),
         },
     )
     # 7. Record Creation in Account (for Lifetime Tracking)
@@ -448,6 +451,9 @@ async def create_group_channel(
             "name": data.name,
             "members": members,
             "members_count": len(members),
+            "master_key_hex": shared_key_bytes.hex(),
+            "derived_encryption_key_hex": qekms.derive_encryption_key(shared_key_bytes).hex(),
+            "derived_signing_key_hex": qekms.derive_signing_key(shared_key_bytes).hex(),
         },
     )
     logger.info(f"Group channel created: {new_channel['id']} by {sender_email}")
@@ -604,6 +610,33 @@ async def clear_channel_messages(
     return {"message": "Channel history permanently deleted by administrator.", "deleted_count": deleted_count}
 
 
+@channel_router.delete("/{channel_id}/messages/{message_id}")
+async def delete_single_message(
+    channel_id: str,
+    message_id: str,
+    user: dict = Depends(get_current_user_from_cookie),
+):
+    """Delete a single message. Only sender or admin can delete."""
+    msg = await MessageModel.get_by_id(message_id)
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    if msg.get("channel_id") != channel_id:
+        raise HTTPException(status_code=400, detail="Message does not belong to this channel")
+
+    user_email = user["sub"]
+    if user["role"] != "admin" and msg.get("sender") != user_email:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this message")
+
+    deleted = await MessageModel.delete_by_id(message_id)
+    if not deleted:
+        raise HTTPException(status_code=500, detail="Failed to delete message")
+    
+    # Broadcast deletion event
+    await chat_manager.broadcast(channel_id, {"type": "message_deleted", "message_id": message_id})
+    return {"message": "Message deleted successfully"}
+
+
 @channel_router.post("/{channel_id}/clear")
 async def clear_chat_for_me(
     channel_id: str,
@@ -723,6 +756,23 @@ async def send_secure_message(
     saved = await MessageModel.create(message_doc)
     
     await chat_manager.broadcast(channel_id, {"type": "message", "data": saved})
+
+    encryption_key = qekms.derive_encryption_key(plain_master)
+    plaintext = "<unable to decrypt on server>"
+    try:
+        parts = data.ciphertext.split(':')
+        if len(parts) == 2:
+            actual_cipher_b64, iv_b64 = parts
+            iv = base64.b64decode(iv_b64)
+            actual_cipher = base64.b64decode(actual_cipher_b64)
+            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+            aesgcm = AESGCM(encryption_key)
+            plaintext_bytes = aesgcm.decrypt(iv, actual_cipher, None)
+            plaintext = plaintext_bytes.decode('utf-8')
+    except Exception as e:
+        logger.error(f"Audit server decryption failed: {e}")
+        plaintext = f"<Decryption failed: {str(e)}>"
+
     await AuditService.log(
         "MESSAGE_SENT",
         user_id=user_email,
@@ -733,6 +783,14 @@ async def send_secure_message(
             "key_version": data.key_version,
             "has_file": bool(data.file_path),
             "file_name": data.file_name,
+            "sender": user_email,
+            "receiver": receiver_email,
+            "plaintext": plaintext,
+            "ciphertext": data.ciphertext,
+            "nonce": data.nonce,
+            "signature": data.signature,
+            "encryption_key_hex": encryption_key.hex(),
+            "timestamp": data.timestamp,
         },
     )
     

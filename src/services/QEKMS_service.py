@@ -124,7 +124,7 @@ class QEKMS_service:
                 qc = QuantumCircuit(n_qubits, n_qubits)
                 qc.h(range(n_qubits))
                 qc.measure(range(n_qubits), range(n_qubits))
-                
+                    
                 job = backend.run(qc, shots=1)
                 result = job.result().get_counts()
                 bitstring = list(result.keys())[0].replace(' ', '')
@@ -145,6 +145,7 @@ class QEKMS_service:
                 self.last_entropy_result["jitter_ms"] = round(jitter, 2)
                 
                 logger.warning("Quantum entropy failed monobit test. Falling back to PRNG.")
+                fallback_key = os.urandom(32)
                 try:
                     await self.audit.log(
                         "KEY_GENERATED",
@@ -158,11 +159,13 @@ class QEKMS_service:
                             "n_qubits": n_qubits,
                             "bit_length": len(accumulated_bitstring),
                             "generated_keys": self.generated_keys_count,
+                            "raw_bitstring": accumulated_bitstring,
+                            "final_key_hex": fallback_key.hex(),
                         },
                     )
                 except Exception as audit_error:
                     logger.warning(f"Quantum audit logging failed: {audit_error}")
-                return os.urandom(32)
+                return fallback_key
 
             self._track_key_generation(accumulated_bitstring, True, n_qubits, "quantum")
             self.last_entropy_result["quality"] = round(quality_score, 4)
@@ -180,6 +183,8 @@ class QEKMS_service:
                         "n_qubits": n_qubits,
                         "bit_length": len(accumulated_bitstring),
                         "generated_keys": self.generated_keys_count,
+                        "raw_bitstring": accumulated_bitstring,
+                        "final_key_hex": int(accumulated_bitstring, 2).to_bytes(32, byteorder='big').hex(),
                     },
                 )
             except Exception as audit_error:
@@ -187,6 +192,7 @@ class QEKMS_service:
             
         except Exception as e:
             self._track_key_generation(accumulated_bitstring, False, n_qubits, "fallback")
+            fallback_key = os.urandom(32)
             try:
                 await self.audit.log(
                     "KEY_GENERATED",
@@ -199,12 +205,14 @@ class QEKMS_service:
                         "n_qubits": n_qubits,
                         "bit_length": len(accumulated_bitstring),
                         "generated_keys": self.generated_keys_count,
+                        "raw_bitstring": accumulated_bitstring,
+                        "final_key_hex": fallback_key.hex(),
                     },
                 )
             except Exception as audit_error:
                 logger.warning(f"Quantum audit logging failed: {audit_error}")
             logger.warning(f"Quantum simulator error, falling back to os.urandom: {e}")
-            return os.urandom(32)
+            return fallback_key
 
         # Convert bitstring to 32 bytes
         int_val = int(accumulated_bitstring, 2)

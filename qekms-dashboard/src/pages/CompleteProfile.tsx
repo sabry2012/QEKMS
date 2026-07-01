@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axiosConfig';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Phone, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Shield, Phone, ArrowRight, CheckCircle2, Lock } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
@@ -12,13 +12,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function CompleteProfile() {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
   const [step, setStep] = useState(1); // 1: Phone, 2: OTP
   const [isPhoneValid, setIsPhoneValid] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [isPending, setIsPending] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
 
   const handleSendOtp = async () => {
     setError('');
@@ -52,14 +54,27 @@ export default function CompleteProfile() {
   };
 
   const handleFinalSubmit = async () => {
+    if (!password || password.length < 8) {
+      setError('Please choose a secure password (min 8 characters).');
+      return;
+    }
+
     setSubmitting(true);
     try {
       await api.patch('/auth/complete-profile', {
         phone_number: phone,
-        otp_code: otp
+        otp_code: otp,
+        password: password
       });
-      await login(); // Refresh user data
-      navigate('/dashboard');
+      
+      // The account is now deactivated until admin approval.
+      // Trying to login/fetchUser will likely fail with 403.
+      setIsPending(true);
+      setTimeout(async () => {
+        await logout(); // Clear cookies
+        navigate('/login');
+      }, 8000);
+
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Verification failed.');
     } finally {
@@ -75,6 +90,29 @@ export default function CompleteProfile() {
       handleFinalSubmit();
     }
   };
+
+  if (isPending) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-center px-8 bg-mesh-dark font-sans text-white">
+        <motion.div 
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-20 h-20 rounded-2xl flex items-center justify-center mb-8 bg-primary-cyan/10 border border-primary-cyan/25"
+        >
+          <Shield size={40} className="text-primary-cyan" />
+        </motion.div>
+        <h1 className="text-4xl font-black tracking-tight mb-4 uppercase">Identity Transmitted</h1>
+        <p className="text-gray-400 text-lg max-w-md leading-relaxed mb-10">
+          Your credentials and quantum node request have been sent for review. 
+          <span className="text-white block mt-2">Access will be granted following administrator approval.</span>
+        </p>
+        <div className="flex items-center gap-3 text-xs font-bold text-primary-cyan uppercase tracking-widest bg-primary-cyan/5 px-6 py-3 rounded-xl border border-primary-cyan/20">
+          <div className="w-2 h-2 rounded-full bg-primary-cyan animate-pulse" />
+          Status: Pending Verification
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-full flex items-center justify-center bg-mesh-dark font-sans text-white relative overflow-hidden">
@@ -93,12 +131,14 @@ export default function CompleteProfile() {
           <div className="w-16 h-16 bg-primary-cyan/10 border border-primary-cyan/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <Shield className="text-primary-cyan" size={32} />
           </div>
-          <h1 className="text-3xl font-black tracking-tighter mb-2">Final Step</h1>
+          <h1 className="text-3xl font-black tracking-tighter mb-2 uppercase">Complete Profile</h1>
           <p className="text-gray-500 text-xs uppercase tracking-[0.2em] font-bold">Secure Node Provisioning</p>
         </div>
 
         <p className="text-gray-400 text-sm text-center mb-8 leading-relaxed">
-          To complete your quantum-secure enrollment, we require a unique phone number for two-factor verification.
+          {step === 1 
+            ? "To complete your quantum-secure enrollment, we require a unique phone number for two-factor verification."
+            : "Set your secure access credentials and enter the verification code sent to your device."}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -119,15 +159,28 @@ export default function CompleteProfile() {
               </motion.div>
             ) : (
               <motion.div key="p2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+                <div className="relative group">
+                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-primary-cyan transition-colors" size={18} />
+                   <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="SET ACCESS PASSWORD"
+                    className="w-full h-14 bg-white/[0.02] border border-white/10 rounded-2xl pl-12 pr-4 text-xs font-bold text-white uppercase tracking-widest outline-none transition-all focus:border-primary-cyan/40 focus:bg-white/5"
+                   />
+                </div>
+
                 <div className="relative">
                   <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-cyan/40" size={18} />
                   <input
                     type="text"
+                    required
                     maxLength={6}
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                    placeholder="000000"
-                    className="w-full h-14 bg-white/[0.02] border border-white/10 rounded-2xl text-center text-2xl tracking-[0.3em] font-black text-white placeholder:text-gray-700 placeholder:tracking-normal outline-none transition-all focus:border-primary-cyan/40 focus:bg-white/5 pl-10"
+                    placeholder="OTP CODE"
+                    className="w-full h-14 bg-white/[0.02] border border-white/10 rounded-2xl text-center text-xl tracking-[0.3em] font-black text-white placeholder:text-gray-700 placeholder:tracking-normal outline-none transition-all focus:border-primary-cyan/40 focus:bg-white/5 pl-10"
                   />
                 </div>
                 <div className="flex justify-between items-center px-2">
